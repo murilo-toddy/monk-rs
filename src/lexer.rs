@@ -1,0 +1,226 @@
+use crate::token::{is_digit, is_letter, Token};
+use std::str;
+
+// TODO keep track of file, line and column for better error reporting
+struct Lexer<'a> {
+    input: &'a [u8],
+    position: usize,
+    read_position: usize,
+    ch: u8,
+}
+
+impl<'a> Lexer<'a> {
+    fn new(input: &[u8]) -> Lexer {
+        let mut l = Lexer {
+            input,
+            position: 0,
+            read_position: 0,
+            ch: 0.into(),
+        };
+        l.read_char();
+        return l;
+    }
+
+    // TODO add UTF8 support
+    fn read_char(&mut self) {
+        if self.read_position >= self.input.len() {
+            self.ch = 0.into();
+        } else {
+            self.ch = self.input[self.read_position]
+        }
+        self.position = self.read_position;
+        self.read_position += 1;
+    }
+
+    fn peek_char(&self) -> u8 {
+        if self.read_position > self.input.len() {
+            return 0;
+        } else {
+            return self.input[self.read_position];
+        }
+    }
+
+    fn read_identifier(&mut self) -> String {
+        let start_pos = self.position;
+        while is_letter(self.ch) {
+            self.read_char();
+        }
+        return String::from_utf8(self.input[start_pos..self.position].to_vec())
+            .unwrap();
+    }
+
+    fn read_integer(&mut self) -> i64 {
+        let start_pos = self.position;
+        while is_digit(self.ch) {
+            self.read_char()
+        }
+        return str::from_utf8(self.input[start_pos..self.position].as_ref())
+            .unwrap()
+            .parse()
+            .expect("should be valid integer")
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self.ch.is_ascii_whitespace() {
+            self.read_char();
+        }
+    }
+
+    fn next_token(&mut self) -> Token {
+        self.skip_whitespace();
+        let token = match self.ch as char {
+            '\0' => Token::Eof,
+            // TODO abstract peeking logic
+            '=' => {
+                match self.peek_char() as char {
+                    '=' => {
+                        self.read_char();
+                        Token::Eq
+                    }
+                    _ => Token::Assign
+                }
+            },
+            '!' => {
+                match self.peek_char() as char {
+                    '=' => {
+                        self.read_char();
+                        Token::Neq
+                    }
+                    _ => Token::Bang
+                }
+            },
+            '+' => Token::Plus,
+            '-' => Token::Minus,
+            '*' => Token::Asterisk,
+            '/' => Token::Slash,
+            '>' => Token::Gt,
+            '<' => Token::Lt,
+            ';' => Token::Semicolon,
+            '(' => Token::Lparen,
+            ')' => Token::Rparen,
+            ',' => Token::Comma,
+            '{' => Token::Lbrace,
+            '}' => Token::Rbrace,
+            _ => {
+                if is_letter(self.ch) {
+                    return Token::from_literal(self.read_identifier());
+                } else if is_digit(self.ch) {
+                    return Token::Integer(self.read_integer());
+                } else {
+                    Token::Illegal(self.ch)
+                }
+            },
+        };
+        self.read_char();
+        return token;
+    }
+}
+
+#[cfg(test)]
+mod lexer_tests {
+    use super::*;
+
+    #[test]
+    fn test_next_token() {
+        let input = "let five = 5;
+let ten = 10;
+let add = fn(x, y) {
+x + y;
+};
+let result = add(five, ten);
+!-/*5;
+5 < 10 > 5;
+
+if (5 < 10) {
+return true;
+} else {
+return false;
+}
+
+10 == 10;
+10 != 9;".as_bytes();
+
+        let tests: Vec<Token> = vec![
+            Token::Let,
+            Token::Ident("five".to_string()),
+            Token::Assign,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident("ten".to_string()),
+            Token::Assign,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident("add".to_string()),
+            Token::Assign,
+            Token::Function,
+            Token::Lparen,
+            Token::Ident("x".to_string()),
+            Token::Comma,
+            Token::Ident("y".to_string()),
+            Token::Rparen,
+            Token::Lbrace,
+            Token::Ident("x".to_string()),
+            Token::Plus,
+            Token::Ident("y".to_string()),
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident("result".to_string()),
+            Token::Assign,
+            Token::Ident("add".to_string()),
+            Token::Lparen,
+            Token::Ident("five".to_string()),
+            Token::Comma,
+            Token::Ident("ten".to_string()),
+            Token::Rparen,
+            Token::Semicolon,
+            Token::Bang,
+            Token::Minus,
+            Token::Slash,
+            Token::Asterisk,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Integer(5),
+            Token::Lt,
+            Token::Integer(10),
+            Token::Gt,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::If,
+            Token::Lparen,
+            Token::Integer(5),
+            Token::Lt,
+            Token::Integer(10),
+            Token::Rparen,
+            Token::Lbrace,
+            Token::Return,
+            Token::True,
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Else,
+            Token::Lbrace,
+            Token::Return,
+            Token::False,
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Integer(10),
+            Token::Eq,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Integer(10),
+            Token::Neq,
+            Token::Integer(9),
+            Token::Semicolon,
+            Token::Eof,
+        ];
+
+        let mut l = Lexer::new(input);
+        for (i, tt) in tests.iter().enumerate() {
+            let token = l.next_token();
+            assert_eq!(token, *tt, "tests[{}] - wrong token type. expected={:?}, got={:?}", i, tt, token);
+        }
+    }
+}
