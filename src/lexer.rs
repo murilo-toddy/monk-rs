@@ -2,7 +2,7 @@ use crate::token::{is_digit, is_letter, Token};
 use std::str;
 
 // TODO keep track of file, line and column for better error reporting
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     input: &'a [u8],
     position: usize,
     read_position: usize,
@@ -10,7 +10,7 @@ struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &[u8]) -> Lexer {
+    pub fn new(input: &[u8]) -> Lexer {
         let mut l = Lexer {
             input,
             position: 0,
@@ -66,48 +66,49 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
         let token = match self.ch as char {
-            '\0' => Token::Eof,
+            // EOF
+            '\0' => None,
             // TODO abstract peeking logic
             '=' => {
                 match self.peek_char() as char {
                     '=' => {
                         self.read_char();
-                        Token::Eq
+                        Some(Token::Eq)
                     }
-                    _ => Token::Assign
+                    _ => Some(Token::Assign)
                 }
             },
             '!' => {
                 match self.peek_char() as char {
                     '=' => {
                         self.read_char();
-                        Token::Neq
+                        Some(Token::Neq)
                     }
-                    _ => Token::Bang
+                    _ => Some(Token::Bang)
                 }
             },
-            '+' => Token::Plus,
-            '-' => Token::Minus,
-            '*' => Token::Asterisk,
-            '/' => Token::Slash,
-            '>' => Token::Gt,
-            '<' => Token::Lt,
-            ';' => Token::Semicolon,
-            '(' => Token::Lparen,
-            ')' => Token::Rparen,
-            ',' => Token::Comma,
-            '{' => Token::Lbrace,
-            '}' => Token::Rbrace,
+            '+' => Some(Token::Plus),
+            '-' => Some(Token::Minus),
+            '*' => Some(Token::Asterisk),
+            '/' => Some(Token::Slash),
+            '>' => Some(Token::Gt),
+            '<' => Some(Token::Lt),
+            ';' => Some(Token::Semicolon),
+            '(' => Some(Token::Lparen),
+            ')' => Some(Token::Rparen),
+            ',' => Some(Token::Comma),
+            '{' => Some(Token::Lbrace),
+            '}' => Some(Token::Rbrace),
             _ => {
                 if is_letter(self.ch) {
                     return Token::from_literal(self.read_identifier());
                 } else if is_digit(self.ch) {
-                    return Token::Integer(self.read_integer());
+                    return Some(Token::Integer(self.read_integer()));
                 } else {
-                    Token::Illegal(self.ch)
+                    Some(Token::Illegal(self.ch))
                 }
             },
         };
@@ -140,81 +141,81 @@ return false;
 10 == 10;
 10 != 9;".as_bytes();
 
-        let tests: Vec<Token> = vec![
-            Token::Let,
-            Token::Ident("five".to_string()),
-            Token::Assign,
-            Token::Integer(5),
-            Token::Semicolon,
-            Token::Let,
-            Token::Ident("ten".to_string()),
-            Token::Assign,
-            Token::Integer(10),
-            Token::Semicolon,
-            Token::Let,
-            Token::Ident("add".to_string()),
-            Token::Assign,
-            Token::Function,
-            Token::Lparen,
-            Token::Ident("x".to_string()),
-            Token::Comma,
-            Token::Ident("y".to_string()),
-            Token::Rparen,
-            Token::Lbrace,
-            Token::Ident("x".to_string()),
-            Token::Plus,
-            Token::Ident("y".to_string()),
-            Token::Semicolon,
-            Token::Rbrace,
-            Token::Semicolon,
-            Token::Let,
-            Token::Ident("result".to_string()),
-            Token::Assign,
-            Token::Ident("add".to_string()),
-            Token::Lparen,
-            Token::Ident("five".to_string()),
-            Token::Comma,
-            Token::Ident("ten".to_string()),
-            Token::Rparen,
-            Token::Semicolon,
-            Token::Bang,
-            Token::Minus,
-            Token::Slash,
-            Token::Asterisk,
-            Token::Integer(5),
-            Token::Semicolon,
-            Token::Integer(5),
-            Token::Lt,
-            Token::Integer(10),
-            Token::Gt,
-            Token::Integer(5),
-            Token::Semicolon,
-            Token::If,
-            Token::Lparen,
-            Token::Integer(5),
-            Token::Lt,
-            Token::Integer(10),
-            Token::Rparen,
-            Token::Lbrace,
-            Token::Return,
-            Token::True,
-            Token::Semicolon,
-            Token::Rbrace,
-            Token::Else,
-            Token::Lbrace,
-            Token::Return,
-            Token::False,
-            Token::Semicolon,
-            Token::Rbrace,
-            Token::Integer(10),
-            Token::Eq,
-            Token::Integer(10),
-            Token::Semicolon,
-            Token::Integer(10),
-            Token::Neq,
-            Token::Integer(9),
-            Token::Semicolon,
-            Token::Eof,
+        let tests: Vec<Option<Token>> = vec![
+            Some(Token::Let),
+            Some(Token::Ident("five".to_string())),
+            Some(Token::Assign),
+            Some(Token::Integer(5)),
+            Some(Token::Semicolon),
+            Some(Token::Let),
+            Some(Token::Ident("ten".to_string())),
+            Some(Token::Assign),
+            Some(Token::Integer(10)),
+            Some(Token::Semicolon),
+            Some(Token::Let),
+            Some(Token::Ident("add".to_string())),
+            Some(Token::Assign),
+            Some(Token::Function),
+            Some(Token::Lparen),
+            Some(Token::Ident("x".to_string())),
+            Some(Token::Comma),
+            Some(Token::Ident("y".to_string())),
+            Some(Token::Rparen),
+            Some(Token::Lbrace),
+            Some(Token::Ident("x".to_string())),
+            Some(Token::Plus),
+            Some(Token::Ident("y".to_string())),
+            Some(Token::Semicolon),
+            Some(Token::Rbrace),
+            Some(Token::Semicolon),
+            Some(Token::Let),
+            Some(Token::Ident("result".to_string())),
+            Some(Token::Assign),
+            Some(Token::Ident("add".to_string())),
+            Some(Token::Lparen),
+            Some(Token::Ident("five".to_string())),
+            Some(Token::Comma),
+            Some(Token::Ident("ten".to_string())),
+            Some(Token::Rparen),
+            Some(Token::Semicolon),
+            Some(Token::Bang),
+            Some(Token::Minus),
+            Some(Token::Slash),
+            Some(Token::Asterisk),
+            Some(Token::Integer(5)),
+            Some(Token::Semicolon),
+            Some(Token::Integer(5)),
+            Some(Token::Lt),
+            Some(Token::Integer(10)),
+            Some(Token::Gt),
+            Some(Token::Integer(5)),
+            Some(Token::Semicolon),
+            Some(Token::If),
+            Some(Token::Lparen),
+            Some(Token::Integer(5)),
+            Some(Token::Lt),
+            Some(Token::Integer(10)),
+            Some(Token::Rparen),
+            Some(Token::Lbrace),
+            Some(Token::Return),
+            Some(Token::True),
+            Some(Token::Semicolon),
+            Some(Token::Rbrace),
+            Some(Token::Else),
+            Some(Token::Lbrace),
+            Some(Token::Return),
+            Some(Token::False),
+            Some(Token::Semicolon),
+            Some(Token::Rbrace),
+            Some(Token::Integer(10)),
+            Some(Token::Eq),
+            Some(Token::Integer(10)),
+            Some(Token::Semicolon),
+            Some(Token::Integer(10)),
+            Some(Token::Neq),
+            Some(Token::Integer(9)),
+            Some(Token::Semicolon),
+            None,
         ];
 
         let mut l = Lexer::new(input);

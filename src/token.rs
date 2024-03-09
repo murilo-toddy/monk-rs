@@ -2,7 +2,6 @@
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Illegal(u8),
-    Eof,
 
     // Identifiers
     Ident(String),
@@ -41,16 +40,16 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn from_literal(literal: String) -> Token {
+    pub fn from_literal(literal: String) -> Option<Token> {
         match literal.as_str() {
-            "fn" => Token::Function,
-            "let" => Token::Let,
-            "if" => Token::If,
-            "else" => Token::Else,
-            "return" => Token::Return,
-            "true" => Token::True,
-            "false" => Token::False,
-            _ => Token::Ident(literal),
+            "fn" => Some(Token::Function),
+            "let" => Some(Token::Let),
+            "if" => Some(Token::If),
+            "else" => Some(Token::Else),
+            "return" => Some(Token::Return),
+            "true" => Some(Token::True),
+            "false" => Some(Token::False),
+            _ => Some(Token::Ident(literal)),
         }
     }
 }
@@ -62,3 +61,4 @@ pub fn is_letter(ch: u8) -> bool {
 pub fn is_digit(ch: u8) -> bool {
     return ch.is_ascii_digit();
 }
+
