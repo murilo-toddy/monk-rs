@@ -113,6 +113,7 @@ impl<'a> Parser<'a> {
         return Some(Box::from(LetStatement {
             name: identifier,
             token: let_token,
+            value: None,
         }));
     }
 
@@ -126,6 +127,7 @@ impl<'a> Parser<'a> {
         }
         return Some(Box::from(ReturnStatement {
             token: return_token,
+            value: None,
         }));
     }
 
@@ -152,9 +154,6 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod parser_tests {
     use super::*;
-
-    fn test_let_statement(statement: &Box<dyn Statement>, name: &String) {
-    }
 
     fn check_parse_errors(p: Parser) {
         let errors = p.get_errors();
@@ -235,6 +234,27 @@ return 838383;".as_bytes();
                 panic!("expected LetStatement but got {:?}", statement);
             }
         }
+    }
+
+    #[test]
+    fn test_string() {
+        let program = Program {
+            statements: vec![
+                Box::from(LetStatement {
+                    token: Token::Let,
+                    name: Identifier {
+                        token: Token::Ident("my_var".to_owned()),
+                        value: "my_var".to_owned(),
+                    },
+                    value: Some(Box::from(Identifier {
+                        token: Token::Ident("another_var".to_owned()),
+                        value: "another_var".to_owned(),
+                    })),
+                }) as Box<dyn Statement>,
+            ],
+        };
+
+        assert_eq!(program.to_string(), "let my_var = another_var;", "to_string() method should work properly")
     }
 }
 

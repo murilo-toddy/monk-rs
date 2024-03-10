@@ -1,16 +1,18 @@
-use core::fmt::Debug;
-use std::any::Any;
+use core::fmt::{Debug, Display};
+use std::{any::Any};
 
 use crate::token::Token;
 
 pub trait Node {
     fn get_token(&self) -> &Token;
+    fn to_string(&self) -> String; // TODO can this be a Display trait?
 }
 
 #[derive(Debug, PartialEq)]
 pub enum StatementType {
     LetStatement,
     ReturnStatement,
+    ExpressionStatement,
 }
 
 pub trait Statement: Node {
@@ -40,6 +42,14 @@ impl Node for Program {
             _ => &self.statements[0].get_token()
         }
     }
+
+    fn to_string(&self) -> String {
+        let mut string = String::new();
+        for s in &self.statements {
+            string.push_str(&s.to_string()[..]);
+        }
+        return string;
+    }
 }
 
 pub struct Identifier {
@@ -57,11 +67,16 @@ impl Node for Identifier {
     fn get_token(&self) -> &Token {
         todo!("not implemented");
     }
+
+    fn to_string(&self) -> String {
+        self.value.clone()
+    }
 }
 
 pub struct LetStatement {
     pub token: Token, // Token::Let
     pub name: Identifier,
+    pub value: Option<Box<dyn Expression>>,
 }
 
 impl Statement for LetStatement {
@@ -82,10 +97,23 @@ impl Node for LetStatement {
     fn get_token(&self) -> &Token {
         &self.token
     }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        s.push_str(&format!("{:?} ", self.token).to_lowercase());
+        s.push_str(&format!("{}", self.name.to_string()));
+        s.push_str(" = ");
+        if let Some(value) = &self.value {
+            s.push_str(&format!("{}", value.to_string()));
+        }
+        s.push_str(";");
+        return s;
+    }
 }
 
 pub struct ReturnStatement {
-    pub token: Token,
+    pub token: Token, // Token::Return
+    pub value: Option<Box<dyn Expression>>,
 }
 
 impl Statement for ReturnStatement {
@@ -105,5 +133,48 @@ impl Statement for ReturnStatement {
 impl Node for ReturnStatement {
     fn get_token(&self) -> &Token {
         &self.token
+    }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        s.push_str(&format!("{:?} ", self.token).to_lowercase());
+        if let Some(value) = &self.value {
+            s.push_str(&format!("{}", value.to_string()));
+        }
+        s.push_str(";");
+        return s;
+    }
+}
+
+pub struct ExpressionStatement {
+    pub token: Token, // first token of the expression
+    pub expression: Option<Box<dyn Expression>>,
+}
+
+impl Statement for ExpressionStatement {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn get_type(&self) -> StatementType {
+        StatementType::ExpressionStatement
+    }
+
+    fn statement_node(&self) {
+        todo!("not implemented")
+    }
+}
+
+impl Node for ExpressionStatement {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        if let Some(exp) = &self.expression {
+            s.push_str(&exp.to_string());
+        }
+        return s; 
     }
 }
