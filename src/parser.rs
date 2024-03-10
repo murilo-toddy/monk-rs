@@ -1,11 +1,25 @@
+use core::fmt;
+
 use crate::lexer::Lexer;
 use crate::token::Token;
 use crate::ast::*;
+
+#[derive(Debug, Clone)]
+struct ParseError {
+    message: String,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "parse error: {}", self.message)
+    }
+}
 
 struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Option<Token>,
     peek_token: Option<Token>,
+    errors: Vec<ParseError>,
 }
 
 impl<'a> Parser<'a> {
@@ -14,11 +28,16 @@ impl<'a> Parser<'a> {
             lexer,
             current_token: None,
             peek_token: None,
+            errors: vec![],
         };
         // set current and peek tokens
         parser.next_token();
         parser.next_token();
         parser
+    }
+
+    fn get_errors(&self) -> &Vec<ParseError> {
+        &self.errors
     }
 
     fn next_token(&mut self) {
@@ -38,6 +57,12 @@ impl<'a> Parser<'a> {
         std::mem::discriminant(t1) == std::mem::discriminant(t2)
     }
 
+    fn peek_error(&mut self, expected_token: &Token) {
+        self.errors.push(ParseError { 
+            message: format!("expected next token to be {:?} but got {:?}", expected_token, self.peek_token).to_owned() 
+        });
+    }
+
     fn expect_peek(&mut self, token: &Token) -> bool {
         if let Some(peek_token) = &self.peek_token {
             if self.token_types_match(&peek_token, token) {
@@ -45,6 +70,7 @@ impl<'a> Parser<'a> {
                 return true;
             }
         }
+        self.peek_error(token);
         return false;
     }
 
@@ -93,7 +119,7 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.current_token {
             Some(Token::Let) => self.parse_let_statement().map(|s| s as Box<dyn Statement>),
-            _ => panic!("did not expect to get {:?}", self.current_token),
+            _ => None,
         }
     }
 
@@ -127,16 +153,32 @@ mod parser_tests {
         }
     }
 
+    fn check_parse_errors(p: Parser) {
+        let errors = p.get_errors();
+        if errors.len() == 0 {
+            return;
+        }
+
+        eprintln!("got {} parse errors", errors.len());
+        for error in errors {
+            eprintln!("{}", error.message);
+        }
+        panic!();
+    }
+
     #[test]
     fn test_let_statements() {
-        let input = "let x = 5;
+        let input = "let x 5;
 let y = 10;
-let foobar = 838383;".as_bytes();
+let foobar 838383;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
+
+        check_parse_errors(parser);
+
         if program.statements.len() != 3 {
             panic!("program does not contain 3 elements")
         }
