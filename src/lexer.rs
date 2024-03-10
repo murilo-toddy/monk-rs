@@ -1,5 +1,5 @@
-use crate::token::{is_digit, is_letter, Token};
 use std::str;
+use crate::token::*;
 
 // TODO keep track of file, line and column for better error reporting
 pub struct Lexer<'a> {
@@ -108,7 +108,7 @@ impl<'a> Lexer<'a> {
                 } else if is_digit(self.ch) {
                     return Some(Token::Integer(self.read_integer()));
                 } else {
-                    Some(Token::Illegal(self.ch))
+                    Some(Token::Illegal(self.ch as char))
                 }
             },
         };
@@ -225,3 +225,4 @@ return false;
         }
     }
 }
+

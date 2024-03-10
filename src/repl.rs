@@ -1,7 +1,6 @@
 use std::io::{self, BufRead, Write};
 use crate::lexer;
 
-
 pub fn start<R, W>(input: &mut R, output: &mut W) -> io::Result<()>
 where
     R: BufRead,
@@ -26,3 +25,4 @@ where
     }
     Ok(())
 }
+

@@ -1,7 +1,8 @@
 // TODO add support for floats
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Illegal(u8),
+    Illegal(char),
+    Eof,
 
     // Identifiers
     Ident(String),
