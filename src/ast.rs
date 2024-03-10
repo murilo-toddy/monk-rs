@@ -10,6 +10,7 @@ pub trait Node {
 #[derive(Debug, PartialEq)]
 pub enum StatementType {
     LetStatement,
+    ReturnStatement,
 }
 
 pub trait Statement: Node {
@@ -79,7 +80,30 @@ impl Statement for LetStatement {
 
 impl Node for LetStatement {
     fn get_token(&self) -> &Token {
-        return &self.token;
+        &self.token
     }
 }
 
+pub struct ReturnStatement {
+    pub token: Token,
+}
+
+impl Statement for ReturnStatement {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn get_type(&self) -> StatementType {
+        StatementType::ReturnStatement
+    }
+
+    fn statement_node(&self) {
+        todo!("not implemented")
+    }
+}
+
+impl Node for ReturnStatement {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+}

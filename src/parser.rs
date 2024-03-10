@@ -84,7 +84,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_let_statement(&mut self) -> Option<Box<LetStatement>> {
-        let let_token = self.current_token.clone();
+        let let_token = self.current_token.clone().unwrap();
 
         // TODO remove this String::from
         if !self.expect_peek(&Token::Ident(String::from(""))) {
@@ -112,13 +112,27 @@ impl<'a> Parser<'a> {
 
         return Some(Box::from(LetStatement {
             name: identifier,
-            token: let_token.unwrap(),
+            token: let_token,
+        }));
+    }
+
+    fn parse_return_statement(&mut self) -> Option<Box<ReturnStatement>> {
+        let return_token = self.current_token.clone().unwrap();
+        self.next_token();
+
+        // TODO skipping expressions until a semicolon is found
+        while !self.current_token_is(Token::Semicolon) {
+            self.next_token();
+        }
+        return Some(Box::from(ReturnStatement {
+            token: return_token,
         }));
     }
 
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.current_token {
             Some(Token::Let) => self.parse_let_statement().map(|s| s as Box<dyn Statement>),
+            Some(Token::Return) => self.parse_return_statement().map(|s| s as Box<dyn Statement>),
             _ => None,
         }
     }
@@ -140,17 +154,6 @@ mod parser_tests {
     use super::*;
 
     fn test_let_statement(statement: &Box<dyn Statement>, name: &String) {
-        if *statement.get_token() != Token::Let {
-            panic!("expected statement with token <Token::Let> but got <{:?}>", statement.get_token());
-        }
-        match statement.as_any().downcast_ref::<LetStatement>() {
-            None => panic!("expected LetStatement but got {:?}", statement),
-            Some(let_statement) => {
-                if let_statement.name.value != *name {
-                    panic!("expected identifier <{}> for let statement but got <{}>", name, let_statement.name.value)
-                }
-            },
-        }
     }
 
     fn check_parse_errors(p: Parser) {
@@ -168,15 +171,14 @@ mod parser_tests {
 
     #[test]
     fn test_let_statements() {
-        let input = "let x 5;
+        let input = "let x = 5;
 let y = 10;
-let foobar 838383;".as_bytes();
+let foobar = 838383;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
-
         check_parse_errors(parser);
 
         if program.statements.len() != 3 {
@@ -191,11 +193,48 @@ let foobar 838383;".as_bytes();
 
         for (i, expected_identifier) in expected_identifiers.iter().enumerate() {
             match program.statements.get(i) {
-                Some(statement) => test_let_statement(statement, expected_identifier),
+                Some(statement) => {
+                    if *statement.get_token() != Token::Let {
+                        panic!("expected statement with token <Token::Let> but got <{:?}>", statement.get_token());
+                    }
+                    match statement.as_any().downcast_ref::<LetStatement>() {
+                        None => panic!("expected LetStatement but got {:?}", statement),
+                        Some(let_statement) => {
+                            if let_statement.name.value != *expected_identifier {
+                                panic!("expected identifier <{}> for let statement but got <{}>", *expected_identifier, let_statement.name.value)
+                            }
+                        },
+                    }
+                }
                 None => panic!("index out of bounds fo statements"),
             }
         }
     }
 
+    #[test]
+    fn test_return_statements() {
+        let input = "return 5;
+return 10;
+return 838383;".as_bytes();
+        
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        check_parse_errors(parser);
+
+        if program.statements.len() != 3 {
+            panic!("program does not contain 3 elements")
+        }
+
+        for statement in program.statements {
+            if *statement.get_token() != Token::Return {
+                panic!("expected statement with token <Token::Return> but got <{:?}>", statement.get_token());
+            }
+            if statement.as_any().downcast_ref::<ReturnStatement>().is_none() {
+                panic!("expected LetStatement but got {:?}", statement);
+            }
+        }
+    }
 }
 
