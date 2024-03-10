@@ -1,5 +1,5 @@
 // TODO add support for floats
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
     Illegal(char),
     Eof,

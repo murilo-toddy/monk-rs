@@ -1,4 +1,6 @@
 use core::fmt;
+use std::collections::HashMap;
+use std::mem::{discriminant, Discriminant};
 
 use crate::lexer::Lexer;
 use crate::token::Token;
@@ -15,11 +17,27 @@ impl fmt::Display for ParseError {
     }
 }
 
+enum Precedence {
+    Lowest = 1,
+    Equals = 2,      // ==
+    LessGreater = 3, // > or <
+    Sum = 4,         // +
+    Product = 5,     // *
+    Prefix = 6,      // -x or !x
+    Call = 7,        // func(x)
+}
+
+type PrefixParseFn = fn(p: &Parser) -> Box<dyn Expression>;
+type InfixParseFn = fn(p: &Parser, prefix: Box<dyn Expression>) -> Box<dyn Expression>;
+
 struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Option<Token>,
     peek_token: Option<Token>,
     errors: Vec<ParseError>,
+
+    prefix_parse_fns: HashMap<Discriminant<Token>, Box<PrefixParseFn>>,
+    infix_parse_fns: HashMap<Discriminant<Token>, Box<InfixParseFn>>,
 }
 
 impl<'a> Parser<'a> {
@@ -29,15 +47,46 @@ impl<'a> Parser<'a> {
             current_token: None,
             peek_token: None,
             errors: vec![],
+
+            prefix_parse_fns: HashMap::new(),
+            infix_parse_fns: HashMap::new(),
         };
         // set current and peek tokens
         parser.next_token();
         parser.next_token();
+
+        // TODO holly shit this is so ugly
+        parser.register_prefix(
+            discriminant(&Token::Ident("".to_owned())),
+            |p| p.parse_identifier(),
+        );
         parser
+    }
+
+    fn parse_identifier(&self) -> Box<dyn Expression> {
+        let token = self.current_token.as_ref().expect("No current token available");
+
+        let value = match token {
+            Token::Ident(value) => value.clone(),
+            _ => panic!("Expected an identifier token"),
+        };
+
+        Box::new(Identifier {
+            token: self.current_token.clone().unwrap(),
+            value,
+        })
     }
 
     fn get_errors(&self) -> &Vec<ParseError> {
         &self.errors
+    }
+
+    fn register_prefix(&mut self, token: Discriminant<Token>, fnc: PrefixParseFn) {
+        self.prefix_parse_fns.insert(token, Box::from(fnc));
+    }
+
+    fn register_infix(&mut self, token: Discriminant<Token>, fnc: InfixParseFn) {
+        self.infix_parse_fns.insert(token, Box::from(fnc));
     }
 
     fn next_token(&mut self) {
@@ -131,11 +180,31 @@ impl<'a> Parser<'a> {
         }));
     }
 
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
+        match self.prefix_parse_fns.get(&discriminant(self.current_token.as_ref().unwrap())) {
+            Some(func) => Some(func(self)),
+            None => None
+        }
+    }
+
+    fn parse_expression_statement(&mut self) -> Option<Box<ExpressionStatement>> {
+        let expression_token = self.current_token.clone().unwrap();
+        let expression = self.parse_expression(Precedence::Lowest);
+
+        if self.peek_is(Token::Semicolon) {
+            self.next_token();
+        }
+        return Some(Box::from(ExpressionStatement {
+            token: expression_token,
+            expression,
+        }));
+    }
+
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.current_token {
             Some(Token::Let) => self.parse_let_statement().map(|s| s as Box<dyn Statement>),
             Some(Token::Return) => self.parse_return_statement().map(|s| s as Box<dyn Statement>),
-            _ => None,
+            _ => self.parse_expression_statement().map(|s| s as Box<dyn Statement>),
         }
     }
 
@@ -176,12 +245,11 @@ let foobar = 838383;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-
         let program = parser.parse_program();
         check_parse_errors(parser);
 
         if program.statements.len() != 3 {
-            panic!("program does not contain 3 elements")
+            panic!("expected program to contain 3 elements but got {}", program.statements.len())
         }
 
         let expected_identifiers = vec![
@@ -218,12 +286,11 @@ return 838383;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-
         let program = parser.parse_program();
         check_parse_errors(parser);
 
         if program.statements.len() != 3 {
-            panic!("program does not contain 3 elements")
+            panic!("expected program to contain 3 elements but got {}", program.statements.len())
         }
 
         for statement in program.statements {
@@ -231,7 +298,41 @@ return 838383;".as_bytes();
                 panic!("expected statement with token <Token::Return> but got <{:?}>", statement.get_token());
             }
             if statement.as_any().downcast_ref::<ReturnStatement>().is_none() {
-                panic!("expected LetStatement but got {:?}", statement);
+                panic!("expected ReturnStatement but got {:?}", statement);
+            }
+        }
+    }
+
+    #[test]
+    fn test_identifier_expression() {
+        let input = "foobar;".as_bytes();
+        
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(parser);
+
+        if program.statements.len() != 1 {
+            panic!("expected program to contain 1 elements but got {}", program.statements.len())
+        }
+
+        let statement = program.statements.first().unwrap();
+        let expression = &statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
+            .expression;
+
+        if let Some(expression) = expression {
+            let identifier = expression
+                .as_any()
+                .downcast_ref::<Identifier>()
+                .unwrap_or_else(|| panic!("expected Identifier"));
+
+            assert_eq!(identifier.value, "foobar");
+            match &identifier.token {
+                Token::Ident(value) => assert_eq!(value, "foobar"),
+                _ => panic!("identifier contains token with different type {:?}", identifier.token),
             }
         }
     }

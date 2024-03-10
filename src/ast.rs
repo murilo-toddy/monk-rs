@@ -1,5 +1,5 @@
-use core::fmt::{Debug, Display};
-use std::{any::Any};
+use core::fmt::Debug;
+use std::any::Any;
 
 use crate::token::Token;
 
@@ -28,6 +28,7 @@ impl Debug for dyn Statement {
 }
 
 pub trait Expression: Node {
+    fn as_any(&self) -> &dyn Any;
     fn expression_node(&self);
 }
 
@@ -58,6 +59,10 @@ pub struct Identifier {
 }
 
 impl Expression for Identifier {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn expression_node(&self) {
         todo!("not implemented");
     }
