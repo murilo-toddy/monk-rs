@@ -99,7 +99,7 @@ impl<'a> Parser<'a> {
             self.next_token();
             return true;
         }
-        return false;
+        false
     }
 
     fn token_types_match(&self, t1: &Token, t2: &Token) -> bool {
@@ -114,13 +114,13 @@ impl<'a> Parser<'a> {
 
     fn expect_peek(&mut self, token: &Token) -> bool {
         if let Some(peek_token) = &self.peek_token {
-            if self.token_types_match(&peek_token, token) {
+            if self.token_types_match(peek_token, token) {
                 self.next_token();
                 return true;
             }
         }
         self.peek_error(token);
-        return false;
+        false
     }
 
     fn current_token_is(&mut self, token: Token) -> bool {
@@ -129,7 +129,7 @@ impl<'a> Parser<'a> {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     fn parse_let_statement(&mut self) -> Option<Box<LetStatement>> {
@@ -159,11 +159,11 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        return Some(Box::from(LetStatement {
+        Some(Box::from(LetStatement {
             name: identifier,
             token: let_token,
             value: None,
-        }));
+        }))
     }
 
     fn parse_return_statement(&mut self) -> Option<Box<ReturnStatement>> {
@@ -174,10 +174,10 @@ impl<'a> Parser<'a> {
         while !self.current_token_is(Token::Semicolon) {
             self.next_token();
         }
-        return Some(Box::from(ReturnStatement {
+        Some(Box::from(ReturnStatement {
             token: return_token,
             value: None,
-        }));
+        }))
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
@@ -194,10 +194,10 @@ impl<'a> Parser<'a> {
         if self.peek_is(Token::Semicolon) {
             self.next_token();
         }
-        return Some(Box::from(ExpressionStatement {
+        Some(Box::from(ExpressionStatement {
             token: expression_token,
             expression,
-        }));
+        }))
     }
 
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
@@ -216,7 +216,7 @@ impl<'a> Parser<'a> {
             }
             self.next_token();
         }
-        return Program { statements }
+        Program { statements }
     }
 }
 

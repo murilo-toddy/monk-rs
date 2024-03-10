@@ -56,10 +56,10 @@ impl Token {
 }
 
 pub fn is_letter(ch: u8) -> bool {
-    return ch.is_ascii_alphabetic() || (ch == ('_' as u8));
+    ch.is_ascii_alphabetic() || ch == b'_'
 }
 
 pub fn is_digit(ch: u8) -> bool {
-    return ch.is_ascii_digit();
+    ch.is_ascii_digit()
 }
 

@@ -11,20 +11,20 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &[u8]) -> Lexer {
-        let mut l = Lexer {
+        let mut lexer = Lexer {
             input,
             position: 0,
             read_position: 0,
-            ch: 0.into(),
+            ch: 0,
         };
-        l.read_char();
-        return l;
+        lexer.read_char();
+        lexer
     }
 
     // TODO add UTF8 support
     fn read_char(&mut self) {
         if self.read_position >= self.input.len() {
-            self.ch = 0.into();
+            self.ch = 0;
         } else {
             self.ch = self.input[self.read_position]
         }
@@ -33,10 +33,9 @@ impl<'a> Lexer<'a> {
     }
 
     fn peek_char(&self) -> u8 {
-        if self.read_position > self.input.len() {
-            return 0;
-        } else {
-            return self.input[self.read_position];
+        match self.read_position > self.input.len() {
+            true => 0,
+            false => self.input[self.read_position],
         }
     }
 
@@ -45,8 +44,7 @@ impl<'a> Lexer<'a> {
         while is_letter(self.ch) {
             self.read_char();
         }
-        return String::from_utf8(self.input[start_pos..self.position].to_vec())
-            .unwrap();
+        String::from_utf8(self.input[start_pos..self.position].to_vec()).unwrap()
     }
 
     fn read_integer(&mut self) -> i64 {
@@ -113,7 +111,7 @@ impl<'a> Lexer<'a> {
             },
         };
         self.read_char();
-        return token;
+        token
     }
 }
 

@@ -40,7 +40,7 @@ impl Node for Program {
     fn get_token(&self) -> &Token {
         match self.statements.len() {
             0 => &Token::Eof,
-            _ => &self.statements[0].get_token()
+            _ => self.statements[0].get_token()
         }
     }
 
@@ -49,7 +49,7 @@ impl Node for Program {
         for s in &self.statements {
             string.push_str(&s.to_string()[..]);
         }
-        return string;
+        string
     }
 }
 
@@ -106,13 +106,13 @@ impl Node for LetStatement {
     fn to_string(&self) -> String {
         let mut s = String::new();
         s.push_str(&format!("{:?} ", self.token).to_lowercase());
-        s.push_str(&format!("{}", self.name.to_string()));
+        s.push_str(self.name.to_string().as_str());
         s.push_str(" = ");
         if let Some(value) = &self.value {
-            s.push_str(&format!("{}", value.to_string()));
+            s.push_str(value.to_string().as_str());
         }
-        s.push_str(";");
-        return s;
+        s.push(';');
+        s
     }
 }
 
@@ -144,10 +144,10 @@ impl Node for ReturnStatement {
         let mut s = String::new();
         s.push_str(&format!("{:?} ", self.token).to_lowercase());
         if let Some(value) = &self.value {
-            s.push_str(&format!("{}", value.to_string()));
+            s.push_str(value.to_string().as_str());
         }
-        s.push_str(";");
-        return s;
+        s.push(';');
+        s
     }
 }
 
@@ -180,6 +180,6 @@ impl Node for ExpressionStatement {
         if let Some(exp) = &self.expression {
             s.push_str(&exp.to_string());
         }
-        return s; 
+        s
     }
 }
