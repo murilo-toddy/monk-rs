@@ -53,31 +53,6 @@ impl Node for Program {
     }
 }
 
-pub struct Identifier {
-    pub token: Token,
-    pub value: String,
-}
-
-impl Expression for Identifier {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for Identifier {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        self.value.clone()
-    }
-}
-
 pub struct LetStatement {
     pub token: Token, // Token::Let
     pub name: Identifier,
@@ -183,3 +158,54 @@ impl Node for ExpressionStatement {
         s
     }
 }
+
+pub struct Identifier {
+    pub token: Token,
+    pub value: String,
+}
+
+impl Expression for Identifier {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn expression_node(&self) {
+        todo!("not implemented");
+    }
+}
+
+impl Node for Identifier {
+    fn get_token(&self) -> &Token {
+        todo!("not implemented");
+    }
+
+    fn to_string(&self) -> String {
+        self.value.clone()
+    }
+}
+
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
+impl Expression for IntegerLiteral {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn expression_node(&self) {
+        todo!("not implemented");
+    }
+}
+
+impl Node for IntegerLiteral {
+    fn get_token(&self) -> &Token {
+        todo!("not implemented");
+    }
+
+    fn to_string(&self) -> String {
+        format!("{}", self.value.clone())
+    }
+}
+

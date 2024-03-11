@@ -60,20 +60,32 @@ impl<'a> Parser<'a> {
             discriminant(&Token::Ident("".to_owned())),
             |p| p.parse_identifier(),
         );
+        parser.register_prefix(
+            discriminant(&Token::Integer(0)),
+            |p| p.parse_integer_literal(),
+        );
         parser
     }
 
     fn parse_identifier(&self) -> Box<dyn Expression> {
-        let token = self.current_token.as_ref().expect("No current token available");
-
-        let value = match token {
+        let value = match self.current_token.as_ref().unwrap() {
             Token::Ident(value) => value.clone(),
-            _ => panic!("Expected an identifier token"),
+            _ => panic!("expected an identifier token"),
         };
-
         Box::new(Identifier {
             token: self.current_token.clone().unwrap(),
             value,
+        })
+    }
+
+    fn parse_integer_literal(&self) -> Box<dyn Expression> {
+        let value = match self.current_token.as_ref().unwrap() {
+            Token::Integer(value) => value,
+            _ => panic!("expected integer token"),
+        };
+        Box::new(IntegerLiteral {
+            token: self.current_token.clone().unwrap(),
+            value: *value,
         })
     }
 
@@ -333,6 +345,40 @@ return 838383;".as_bytes();
             match &identifier.token {
                 Token::Ident(value) => assert_eq!(value, "foobar"),
                 _ => panic!("identifier contains token with different type {:?}", identifier.token),
+            }
+        }
+    }
+
+    #[test]
+    fn test_integer_literal_expression() {
+        let input = "5;".as_bytes();
+        
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(parser);
+
+        if program.statements.len() != 1 {
+            panic!("expected program to contain 1 elements but got {}", program.statements.len())
+        }
+
+        let statement = program.statements.first().unwrap();
+        let expression = &statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
+            .expression;
+
+        if let Some(expression) = expression {
+            let integer = expression
+                .as_any()
+                .downcast_ref::<IntegerLiteral>()
+                .unwrap_or_else(|| panic!("expected IntegerLiteral"));
+
+            assert_eq!(integer.value, 5);
+            match &integer.token {
+                Token::Integer(value) => assert_eq!(*value, 5),
+                _ => panic!("integer contains token with different type {:?}", integer .token),
             }
         }
     }
