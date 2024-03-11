@@ -27,8 +27,8 @@ enum Precedence {
     Call = 7,        // func(x)
 }
 
-type PrefixParseFn = fn(p: &Parser) -> Box<dyn Expression>;
-type InfixParseFn = fn(p: &Parser, prefix: Box<dyn Expression>) -> Box<dyn Expression>;
+type PrefixParseFn = fn(p: &mut Parser) -> Box<dyn Expression>;
+type InfixParseFn = fn(p: &mut Parser, prefix: Box<dyn Expression>) -> Box<dyn Expression>;
 
 struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -64,10 +64,18 @@ impl<'a> Parser<'a> {
             discriminant(&Token::Integer(0)),
             |p| p.parse_integer_literal(),
         );
+        parser.register_prefix(
+            discriminant(&Token::Bang),
+            |p| p.parse_prefix_expression(),
+        );
+        parser.register_prefix(
+            discriminant(&Token::Minus),
+            |p| p.parse_prefix_expression(),
+        );
         parser
     }
 
-    fn parse_identifier(&self) -> Box<dyn Expression> {
+    fn parse_identifier(&mut self) -> Box<dyn Expression> {
         let value = match self.current_token.as_ref().unwrap() {
             Token::Ident(value) => value.clone(),
             _ => panic!("expected an identifier token"),
@@ -78,7 +86,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_integer_literal(&self) -> Box<dyn Expression> {
+    fn parse_integer_literal(&mut self) -> Box<dyn Expression> {
         let value = match self.current_token.as_ref().unwrap() {
             Token::Integer(value) => value,
             _ => panic!("expected integer token"),
@@ -86,6 +94,18 @@ impl<'a> Parser<'a> {
         Box::new(IntegerLiteral {
             token: self.current_token.clone().unwrap(),
             value: *value,
+        })
+    }
+
+    fn parse_prefix_expression(&mut self) -> Box<dyn Expression> {
+        let current_token = self.current_token.clone().unwrap();
+        self.next_token();
+        Box::from(PrefixExpression {
+            token: current_token.clone(),
+            operator: current_token.to_string(),
+            right: self.parse_expression(Precedence::Prefix).unwrap_or_else(||
+                panic!("prefix expressions should have right")
+            ),
         })
     }
 
@@ -193,9 +213,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
-        match self.prefix_parse_fns.get(&discriminant(self.current_token.as_ref().unwrap())) {
+        // TODO if possible, remove this clone
+        match self.prefix_parse_fns.clone().get(&discriminant(self.current_token.as_ref().unwrap())) {
             Some(func) => Some(func(self)),
-            None => None
+            None => {
+                self.errors.push(ParseError { 
+                    message: format!("no prefix parse function found for {:?}", self.current_token.as_ref().unwrap())
+                });
+                None
+            }
         }
     }
 
@@ -381,6 +407,52 @@ return 838383;".as_bytes();
                 _ => panic!("integer contains token with different type {:?}", integer .token),
             }
         }
+    }
+
+    #[test]
+    fn test_prefix_expression() {
+        let tests = vec![
+            ("!5;", "!", 5),
+            ("-15;", "-", 15),
+        ];
+
+        for (input, op, int) in tests {
+            let lexer = Lexer::new(input.as_bytes());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parse_errors(parser);
+
+            if program.statements.len() != 1 {
+                panic!("expected program to contain 1 elements but got {}", program.statements.len())
+            }
+
+            let statement = program.statements.first().unwrap();
+            let expression = &statement
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
+                .expression;
+
+            if let Some(expression) = expression {
+                let prefix = expression
+                    .as_any()
+                    .downcast_ref::<PrefixExpression>()
+                    .unwrap_or_else(|| panic!("expected PrefixExpression"));
+
+                assert_eq!(prefix.operator, op);
+                test_integer_literal(&prefix.right, int);
+            }
+        }
+    }
+
+    fn test_integer_literal(exp: &Box<dyn Expression>, int: i64) {
+        let int_exp = &exp
+            .as_any()
+            .downcast_ref::<IntegerLiteral>()
+            .unwrap_or_else(|| panic!("expected IntegerLiteral"));
+        
+        assert_eq!(int_exp.value, int);
+        assert_eq!(int_exp.token, Token::Integer(int));
     }
 
     #[test]

@@ -160,7 +160,7 @@ impl Node for ExpressionStatement {
 }
 
 pub struct Identifier {
-    pub token: Token,
+    pub token: Token, // Token::Ident
     pub value: String,
 }
 
@@ -185,7 +185,7 @@ impl Node for Identifier {
 }
 
 pub struct IntegerLiteral {
-    pub token: Token,
+    pub token: Token, // Token::Integer
     pub value: i64,
 }
 
@@ -206,6 +206,37 @@ impl Node for IntegerLiteral {
 
     fn to_string(&self) -> String {
         format!("{}", self.value.clone())
+    }
+}
+
+pub struct PrefixExpression {
+    pub token: Token, // prefix token
+    pub operator: String,
+    pub right: Box<dyn Expression>,
+}
+
+impl Expression for PrefixExpression {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn expression_node(&self) {
+        todo!("not implemented");
+    }
+}
+
+impl Node for PrefixExpression {
+    fn get_token(&self) -> &Token {
+        todo!("not implemented");
+    }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        s.push('(');
+        s.push_str(self.operator.as_str());
+        s.push_str(self.right.to_string().as_str());
+        s.push(')');
+        s
     }
 }
 

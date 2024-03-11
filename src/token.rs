@@ -53,6 +53,15 @@ impl Token {
             _ => Some(Token::Ident(literal)),
         }
     }
+
+    // TODO this feels wrong
+    pub fn to_string(&self) -> String {
+        match self {
+            Token::Bang => "!",
+            Token::Minus => "-",
+            _ => "",
+        }.to_owned()
+    }
 }
 
 pub fn is_letter(ch: u8) -> bool {
