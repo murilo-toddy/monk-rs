@@ -159,6 +159,35 @@ impl Node for ExpressionStatement {
     }
 }
 
+pub struct BlockStatement {
+    pub token: Token, // Token::Lbrace
+    pub statements: Vec<Box<dyn Statement>>,
+}
+
+impl Expression for BlockStatement {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn expression_node(&self) {
+        todo!("not implemented");
+    }
+}
+
+impl Node for BlockStatement {
+    fn get_token(&self) -> &Token {
+        todo!("not implemented");
+    }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        for statement in &self.statements {
+            s.push_str(statement.to_string().as_str());
+        }
+        s
+    }
+}
+
 pub struct Identifier {
     pub token: Token, // Token::Ident
     pub value: String,
@@ -298,3 +327,38 @@ impl Node for InfixExpression {
     }
 }
 
+pub struct IfExpression {
+    pub token: Token, // Token::If
+    pub condition: Box<dyn Expression>,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
+}
+
+impl Expression for IfExpression {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn expression_node(&self) {
+        todo!("not implemented");
+    }
+}
+
+impl Node for IfExpression {
+    fn get_token(&self) -> &Token {
+        todo!("not implemented");
+    }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        s.push_str("if");
+        s.push_str(self.condition.to_string().as_str());
+        s.push(' ');
+        s.push_str(self.consequence.to_string().as_str());
+        if let Some(alternative) = &self.alternative {
+            s.push_str("else ");
+            s.push_str(alternative.to_string().as_str());
+        }
+        s
+    }
+}

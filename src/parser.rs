@@ -59,6 +59,11 @@ impl<'a> Parser<'a> {
 
         // TODO holly shit this is so ugly
         parser.register_prefix(
+            discriminant(&Token::If),
+            |p| p.parse_if_expression(),
+        );
+
+        parser.register_prefix(
             discriminant(&Token::Lparen),
             |p| p.parse_grouped_expression(),
         );
@@ -123,6 +128,63 @@ impl<'a> Parser<'a> {
         );
 
         parser
+    }
+
+    fn parse_if_expression(&mut self) -> Box<dyn Expression> {
+        let current_token = self.current_token.clone().unwrap();
+        if !self.expect_peek(&Token::Lparen) {
+            // TODO update this to be a parse error
+            panic!("If expressions should be accompanied by a left parenthesis");
+        }
+
+        self.next_token();
+        let condition = self.parse_expression(Precedence::Lowest);
+
+        if !self.expect_peek(&Token::Rparen) {
+            // TODO update this to be a parse error
+            panic!("The if expression should end with a right parenthesis");
+        }
+        if !self.expect_peek(&Token::Lbrace) {
+            // TODO update this to be a parse error
+            panic!("The consequence should start with a left brace");
+        }
+        let consequence = self.parse_block_statement();
+
+        let mut alternative: Option<BlockStatement> = None;
+        // TODO add support for else if
+        if self.peek_token_is(Token::Else) {
+            self.next_token();
+            if !self.expect_peek(&Token::Lbrace) {
+                panic!("Else block should start with left brace");
+            }
+
+            alternative = Some(self.parse_block_statement());
+        }
+
+        return Box::from(IfExpression {
+            token: current_token,
+            condition: condition.unwrap(),
+            consequence,
+            alternative,
+        });
+    }
+
+    fn parse_block_statement(&mut self) -> BlockStatement {
+        let current_token = self.current_token.clone().unwrap();
+        self.next_token();
+
+        let mut statements = Vec::new();
+        while self.current_token.is_some() && !self.current_token_is(Token::Rbrace) {
+            if let Some(statement) = self.parse_statement() {
+                statements.push(statement);
+            }
+            self.next_token();
+        }
+
+        return BlockStatement {
+            token: current_token,
+            statements,
+        };
     }
 
     fn parse_grouped_expression(&mut self) -> Box<dyn Expression> {
@@ -234,8 +296,9 @@ impl<'a> Parser<'a> {
     }
 
     fn current_token_is(&mut self, token: Token) -> bool {
-        if let Some(current_token) = self.current_token.take() {
-            if self.token_types_match(&current_token, &token) {
+        // TODO remove clone
+        if let Some(current_token) = &self.current_token {
+            if self.token_types_match(current_token, &token) {
                 return true;
             }
         }
@@ -480,6 +543,7 @@ return 838383;".as_bytes();
         }
     }
 
+    // TODO refactor test structure
     #[test]
     fn test_integer_literal_expression() {
         let input = "5;".as_bytes();
@@ -638,6 +702,130 @@ return 838383;".as_bytes();
         
         assert_eq!(int_exp.value, int);
         assert_eq!(int_exp.token, Token::Integer(int));
+    }
+
+    #[test]
+    fn test_if_statement() {
+        let input = "if (x < y) { x }".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(parser);
+
+        assert_eq!(program.statements.len(), 1,
+            "expected program to contain 1 elements but got {}", program.statements.len());
+
+        let statement = program.statements.first().unwrap();
+        let expression = &statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
+            .expression;
+
+        if let Some(expression) = expression {
+            let if_expression = expression
+                .as_any()
+                .downcast_ref::<IfExpression>()
+                .unwrap_or_else(|| panic!("expected IfExpression"));
+
+            let condition = if_expression 
+                .condition
+                .as_any()
+                .downcast_ref::<InfixExpression>()
+                .unwrap_or_else(|| panic!("expected InfixExpression"));
+
+            check_identifier_equals(&condition.left, "x");
+            assert_eq!(condition.operator, "<");
+            check_identifier_equals(&condition.right, "y");
+            
+            assert_eq!(if_expression.consequence.statements.len(), 1, 
+                       "consequence should have 1 statement but got {}", if_expression.consequence.statements.len());
+
+            let consequence = if_expression 
+                .consequence
+                .statements
+                .first()
+                .unwrap()
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .unwrap_or_else(|| panic!("expected ExpressionStatement"));
+
+            check_identifier_equals(consequence.expression.as_ref().unwrap(), "x");
+
+            assert!(if_expression.alternative.is_none(), "IfStatement should have no alternative");
+        }
+    }
+
+    #[test]
+    fn test_if_else_statement() {
+        let input = "if (x < y) { x } else { y }".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(parser);
+
+        if program.statements.len() != 1 {
+            panic!("expected program to contain 1 elements but got {}", program.statements.len())
+        }
+
+        let statement = program.statements.first().unwrap();
+        let expression = &statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
+            .expression;
+
+        if let Some(expression) = expression {
+            let if_expression = expression
+                .as_any()
+                .downcast_ref::<IfExpression>()
+                .unwrap_or_else(|| panic!("expected IfExpression"));
+
+            let condition = if_expression 
+                .condition
+                .as_any()
+                .downcast_ref::<InfixExpression>()
+                .unwrap_or_else(|| panic!("expected InfixExpression"));
+
+            check_identifier_equals(&condition.left, "x");
+            assert_eq!(condition.operator, "<");
+            check_identifier_equals(&condition.right, "y");
+            
+            assert_eq!(if_expression.consequence.statements.len(), 1, 
+                       "consequence should have 1 statement but got {}", if_expression.consequence.statements.len());
+
+            let consequence = if_expression 
+                .consequence
+                .statements
+                .first()
+                .unwrap()
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .unwrap_or_else(|| panic!("expected ExpressionStatement"));
+            check_identifier_equals(consequence.expression.as_ref().unwrap(), "x");
+
+            assert!(if_expression.alternative.is_some());
+            let alternative = if_expression 
+                .alternative
+                .as_ref()
+                .unwrap()
+                .statements
+                .first()
+                .unwrap()
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .unwrap_or_else(|| panic!("expected ExpressionStatement"));
+            check_identifier_equals(alternative.expression.as_ref().unwrap(), "y");
+        }
+    }
+
+    fn check_identifier_equals(actual: &Box<dyn Expression>, expected: &str) {
+        let actual_ident = actual 
+            .as_any()
+            .downcast_ref::<Identifier>()
+            .unwrap_or_else(|| panic!("expected Identifer"));
+
+        assert_eq!(actual_ident.value, expected.to_owned());
     }
 
     #[test]
