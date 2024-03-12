@@ -59,6 +59,20 @@ impl<'a> Parser<'a> {
 
         // TODO holly shit this is so ugly
         parser.register_prefix(
+            discriminant(&Token::Lparen),
+            |p| p.parse_grouped_expression(),
+        );
+
+        parser.register_prefix(
+            discriminant(&Token::True),
+            |p| p.parse_boolean(),
+        );
+        parser.register_prefix(
+            discriminant(&Token::False),
+            |p| p.parse_boolean(),
+        );
+
+        parser.register_prefix(
             discriminant(&Token::Ident("".to_owned())),
             |p| p.parse_identifier(),
         );
@@ -107,7 +121,19 @@ impl<'a> Parser<'a> {
             discriminant(&Token::Gt),
             |p, prefix| p.parse_infix_expression(prefix),
         );
+
         parser
+    }
+
+    fn parse_grouped_expression(&mut self) -> Box<dyn Expression> {
+        self.next_token();
+
+        let expression = self.parse_expression(Precedence::Lowest);
+        if !self.expect_peek(&Token::Rparen) {
+            // TODO come back to this, this is awful
+            panic!("Missing right paren")
+        }
+        expression.unwrap()
     }
 
     fn parse_identifier(&mut self) -> Box<dyn Expression> {
@@ -129,6 +155,13 @@ impl<'a> Parser<'a> {
         Box::new(IntegerLiteral {
             token: self.current_token.clone().unwrap(),
             value: *value,
+        })
+    }
+
+    fn parse_boolean(&mut self) -> Box<dyn Expression> {
+        Box::from(Boolean {
+            token: self.current_token.clone().unwrap(),
+            value: self.current_token_is(Token::True),
         })
     }
 
@@ -482,6 +515,43 @@ return 838383;".as_bytes();
     }
 
     #[test]
+    fn test_boolean_expression() {
+        let tests = [("true;", true), ("false;", false)];
+        
+        for (input, expected) in tests {
+            let lexer = Lexer::new(input.as_bytes());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parse_errors(parser);
+
+            if program.statements.len() != 1 {
+                panic!("expected program to contain 1 elements but got {}", program.statements.len())
+            }
+
+            let statement = program.statements.first().unwrap();
+            let expression = &statement
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
+                .expression;
+
+            if let Some(expression) = expression {
+                let boolean = expression
+                    .as_any()
+                    .downcast_ref::<Boolean>()
+                    .unwrap_or_else(|| panic!("expected Boolean"));
+
+                match &boolean.token {
+                    Token::True => assert_eq!(expected, true),
+                    Token::False => assert_eq!(expected, false),
+                    _ => panic!("boolean contains token with different type {:?}", boolean.token),
+                }
+                assert_eq!(boolean.value, expected);
+            }
+        }
+    }
+
+    #[test]
     fn test_prefix_expression() {
         let tests = vec![
             ("!5;", "!", 5),
@@ -586,6 +656,13 @@ return 838383;".as_bytes();
             ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
             ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
             ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+            ("true", "true"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());

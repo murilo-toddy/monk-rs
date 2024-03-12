@@ -209,6 +209,31 @@ impl Node for IntegerLiteral {
     }
 }
 
+pub struct Boolean {
+    pub token: Token, // Token::Boolean
+    pub value: bool,
+}
+
+impl Expression for Boolean {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn expression_node(&self) {
+        todo!("not implemented");
+    }
+}
+
+impl Node for Boolean {
+    fn get_token(&self) -> &Token {
+        todo!("not implemented");
+    }
+
+    fn to_string(&self) -> String {
+        format!("{}", self.value.clone())
+    }
+}
+
 pub struct PrefixExpression {
     pub token: Token, // prefix token
     pub operator: String,
