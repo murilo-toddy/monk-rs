@@ -42,6 +42,7 @@ struct Parser<'a> {
     infix_parse_fns: HashMap<Discriminant<Token>, Box<InfixParseFn>>,
 }
 
+// TODO reorder internal functions
 impl<'a> Parser<'a> {
     fn new(lexer: Lexer) -> Parser {
         let mut parser = Parser {
@@ -58,6 +59,11 @@ impl<'a> Parser<'a> {
         parser.next_token();
 
         // TODO holly shit this is so ugly
+        parser.register_prefix(
+            discriminant(&Token::Function),
+            |p| p.parse_function_literal(),
+        );
+
         parser.register_prefix(
             discriminant(&Token::If),
             |p| p.parse_if_expression(),
@@ -128,6 +134,64 @@ impl<'a> Parser<'a> {
         );
 
         parser
+    }
+
+    fn parse_function_literal(&mut self) -> Box<dyn Expression> {
+        let function_token = self.current_token.clone().unwrap();
+        println!("{:?} {:?}", self.current_token, self.peek_token);
+        if !self.expect_peek(&Token::Lparen) {
+            // TODO add parse error
+            panic!("function literal should contain a left parenthesis");
+        }
+        
+        let arguments = self.parse_function_arguments();
+        println!("{:?} {:?}", self.current_token, self.peek_token);
+        if !self.expect_peek(&Token::Lbrace) {
+            // TODO add parse error
+            panic!("function literal should contain a block statement after arguments");
+        }
+    
+        let body = self.parse_block_statement();
+        return Box::from(FunctionLiteral {
+            token: function_token,
+            arguments,
+            body,
+        });
+    }
+
+    fn parse_function_arguments(&mut self) -> Vec<Identifier> {
+        let mut identifiers = Vec::new();
+
+        if self.peek_token_is(Token::Rparen) {
+            // TODO this could be a expect_peek
+            self.next_token();
+            return identifiers;
+        }
+
+        self.next_token();
+        if let Some(Token::Ident(value)) = &self.current_token {
+            identifiers.push(Identifier {
+                token: self.current_token.clone().unwrap(),
+                value: value.clone(),
+            });
+        }
+
+        while self.peek_token_is(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            if let Some(Token::Ident(value)) = &self.current_token {
+                identifiers.push(Identifier {
+                    token: self.current_token.clone().unwrap(),
+                    value: value.clone(),
+                });
+            }
+        }
+
+        if !self.expect_peek(&Token::Rparen) {
+            panic!("function arguments must end with right parenthesis");
+        }
+
+        identifiers
     }
 
     fn parse_if_expression(&mut self) -> Box<dyn Expression> {
@@ -429,7 +493,8 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod parser_tests {
     use super::*;
-
+    
+    // TODO these tests are out of hand
     fn check_parse_errors(p: Parser) {
         let errors = p.get_errors();
         if errors.len() == 0 {
@@ -816,6 +881,64 @@ return 838383;".as_bytes();
                 .downcast_ref::<ExpressionStatement>()
                 .unwrap_or_else(|| panic!("expected ExpressionStatement"));
             check_identifier_equals(alternative.expression.as_ref().unwrap(), "y");
+        }
+    }
+
+    #[test]
+    fn test_function_literal() {
+        let input = "fn(x, y) { x + y; }".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(parser);
+
+        if program.statements.len() != 1 {
+            panic!("expected program to contain 1 elements but got {}", program.statements.len())
+        }
+
+        let statement = program.statements.first().unwrap();
+        let expression = &statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
+            .expression;
+
+        if let Some(expression) = expression {
+            let func = expression
+                .as_any()
+                .downcast_ref::<FunctionLiteral>()
+                .unwrap_or_else(|| panic!("expected FunctionLiteral"));
+
+            assert_eq!(func.arguments.len(), 2, "function must contain 2 arguments");
+            let first_arg = Box::from(func.arguments[0].clone()) as Box<dyn Expression>;
+            check_identifier_equals(&first_arg, "x");
+            let second_arg = Box::from(func.arguments[1].clone()) as Box<dyn Expression>;
+            check_identifier_equals(&second_arg, "y");
+            
+            assert_eq!(func.body.statements.len(), 1, 
+                       "function body should have 1 statement but got {}", func.body.statements.len());
+
+            let statement = func
+                .body
+                .statements
+                .first()
+                .unwrap()
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", func));
+
+
+            let infix = statement
+                .expression
+                .as_ref()
+                .unwrap()
+                .as_any()
+                .downcast_ref::<InfixExpression>()
+                .unwrap_or_else(|| panic!("expected InfixExpression but got {:?}", func));
+
+            check_identifier_equals(&infix.left, "x");
+            assert_eq!(infix.operator, "+");
+            check_identifier_equals(&infix.right, "y");
         }
     }
 

@@ -159,6 +159,7 @@ impl Node for ExpressionStatement {
     }
 }
 
+#[derive(Debug)]
 pub struct BlockStatement {
     pub token: Token, // Token::Lbrace
     pub statements: Vec<Box<dyn Statement>>,
@@ -188,6 +189,7 @@ impl Node for BlockStatement {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Identifier {
     pub token: Token, // Token::Ident
     pub value: String,
@@ -359,6 +361,44 @@ impl Node for IfExpression {
             s.push_str("else ");
             s.push_str(alternative.to_string().as_str());
         }
+        s
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionLiteral {
+    pub token: Token, // Token::Function
+    pub arguments: Vec<Identifier>,
+    pub body: BlockStatement,
+}
+
+impl Expression for FunctionLiteral {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn expression_node(&self) {
+        todo!("not implemented");
+    }
+}
+
+impl Node for FunctionLiteral {
+    fn get_token(&self) -> &Token {
+        todo!("not implemented");
+    }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        s.push_str("fn(");
+        s.push_str(self.arguments
+            .iter()
+            .map(|arg| arg.to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+            .as_str());
+
+        s.push_str(") ");
+        s.push_str(self.body.to_string().as_str());
         s
     }
 }
