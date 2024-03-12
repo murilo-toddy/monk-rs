@@ -57,8 +57,15 @@ impl Token {
     // TODO this feels wrong
     pub fn to_string(&self) -> String {
         match self {
+            Token::Plus => "+",
             Token::Bang => "!",
             Token::Minus => "-",
+            Token::Asterisk => "*",
+            Token::Slash => "/",
+            Token::Eq => "==",
+            Token::Neq => "!=",
+            Token::Lt => "<",
+            Token::Gt => ">",
             _ => "",
         }.to_owned()
     }
