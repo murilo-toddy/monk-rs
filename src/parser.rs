@@ -1,5 +1,4 @@
 use core::fmt;
-use std::collections::HashMap;
 use std::mem::{discriminant, Discriminant};
 
 use crate::lexer::Lexer;
@@ -28,18 +27,11 @@ enum Precedence {
     Call = 7,        // func(x)
 }
 
-
-type PrefixParseFn = fn(p: &mut Parser) -> Box<dyn Expression>;
-type InfixParseFn = fn(p: &mut Parser, prefix: Box<dyn Expression>) -> Box<dyn Expression>;
-
 struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
     peek_token: Token,
     errors: Vec<ParseError>,
-
-    prefix_parse_fns: HashMap<Discriminant<Token>, Box<PrefixParseFn>>,
-    infix_parse_fns: HashMap<Discriminant<Token>, Box<InfixParseFn>>,
 }
 
 // TODO reorder internal functions
@@ -50,89 +42,10 @@ impl<'a> Parser<'a> {
             current_token: Token::Eof,
             peek_token: Token::Eof,
             errors: vec![],
-
-            prefix_parse_fns: HashMap::new(),
-            infix_parse_fns: HashMap::new(),
         };
         // set current and peek tokens
         parser.next();
         parser.next();
-
-        // TODO holly shit this is so ugly
-        parser.register_prefix(
-            discriminant(&Token::Function),
-            |p| p.parse_function_literal(),
-        );
-
-        parser.register_prefix(
-            discriminant(&Token::If),
-            |p| p.parse_if_expression(),
-        );
-
-        parser.register_prefix(
-            discriminant(&Token::Lparen),
-            |p| p.parse_grouped_expression(),
-        );
-
-        parser.register_prefix(
-            discriminant(&Token::True),
-            |p| p.parse_boolean(),
-        );
-        parser.register_prefix(
-            discriminant(&Token::False),
-            |p| p.parse_boolean(),
-        );
-
-        parser.register_prefix(
-            discriminant(&Token::Ident("".to_owned())),
-            |p| p.parse_identifier(),
-        );
-        parser.register_prefix(
-            discriminant(&Token::Integer(0)),
-            |p| p.parse_integer_literal(),
-        );
-        parser.register_prefix(
-            discriminant(&Token::Bang),
-            |p| p.parse_prefix_expression(),
-        );
-        parser.register_prefix(
-            discriminant(&Token::Minus),
-            |p| p.parse_prefix_expression(),
-        );
-
-        parser.register_infix(
-            discriminant(&Token::Plus),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-        parser.register_infix(
-            discriminant(&Token::Minus),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-        parser.register_infix(
-            discriminant(&Token::Slash),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-        parser.register_infix(
-            discriminant(&Token::Asterisk),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-        parser.register_infix(
-            discriminant(&Token::Eq),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-        parser.register_infix(
-            discriminant(&Token::Neq),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-        parser.register_infix(
-            discriminant(&Token::Lt),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-        parser.register_infix(
-            discriminant(&Token::Gt),
-            |p, prefix| p.parse_infix_expression(prefix),
-        );
-
         parser
     }
 
@@ -321,14 +234,6 @@ impl<'a> Parser<'a> {
         &self.errors
     }
 
-    fn register_prefix(&mut self, token: Discriminant<Token>, fnc: PrefixParseFn) {
-        self.prefix_parse_fns.insert(token, Box::from(fnc));
-    }
-
-    fn register_infix(&mut self, token: Discriminant<Token>, fnc: InfixParseFn) {
-        self.infix_parse_fns.insert(token, Box::from(fnc));
-    }
-
     fn next(&mut self) {
         self.current_token = self.peek_token.clone();
         self.peek_token = self.lexer.next();
@@ -445,19 +350,41 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
-        // TODO need to add parse error here if result is none
-        let prefix_func = self.prefix_parse_fns.get(&discriminant(&self.current_token))?;
-        // TODO if possible, remove this clone
-        let mut left_expression = prefix_func.clone()(self);
+        
+        // prefix expressions
+        let mut left_expression = match &self.current_token {
+            Token::Function => self.parse_function_literal(),
+            Token::If => self.parse_if_expression(),
+            Token::Lparen => self.parse_grouped_expression(),
+            Token::True | Token::False => self.parse_boolean(),
+            Token::Ident(_) => self.parse_identifier(),
+            Token::Integer(_) => self.parse_integer_literal(),
+            Token::Bang | Token::Minus => self.parse_prefix_expression(),
+            _ => {
+                // TODO add parse error here
+                return None
+            },
+        };
 
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
-            // TODO remove clone
-            left_expression = if let Some(infix) = self.infix_parse_fns.clone().get(&discriminant(&self.peek_token)) {
-                self.next();
-                infix(self, left_expression)
-            } else {
-                return Some(left_expression);
-            };
+            
+            // infix expressions
+            left_expression = match self.peek_token {
+                Token::Plus
+                | Token::Minus
+                | Token::Slash
+                | Token::Asterisk
+                | Token::Eq
+                | Token::Neq
+                | Token::Lt
+                | Token::Gt => {
+                    self.next();
+                    self.parse_infix_expression(left_expression)
+                },
+                _ => {
+                    return Some(left_expression);
+                }
+            }
         }
         Some(left_expression)
     }
