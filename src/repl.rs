@@ -1,5 +1,6 @@
 use std::io::{self, BufRead, Write};
 use crate::lexer;
+use crate::token::Token;
 
 pub fn start<R, W>(input: &mut R, output: &mut W) -> io::Result<()>
 where
@@ -12,7 +13,8 @@ where
     for line in input.lines() {
         if let Ok(line) = line {
             let mut lexer = lexer::Lexer::new(line.as_bytes());
-            while let Some(token) = lexer.next_token() {
+            let token = lexer.next();
+            while token != Token::Eof {
                 // TODO handle errors
                 output.write_all(format!("{:?}\n", token).as_bytes()).unwrap();
                 output.flush().unwrap();

@@ -41,7 +41,7 @@ impl<'a> Lexer<'a> {
 
     fn read_identifier(&mut self) -> String {
         let start_pos = self.position;
-        while is_letter(self.ch) {
+        while Self::is_letter(self.ch) {
             self.read_char();
         }
         String::from_utf8(self.input[start_pos..self.position].to_vec()).unwrap()
@@ -49,7 +49,7 @@ impl<'a> Lexer<'a> {
 
     fn read_integer(&mut self) -> i64 {
         let start_pos = self.position;
-        while is_digit(self.ch) {
+        while Self::is_digit(self.ch) {
             self.read_char()
         }
         return str::from_utf8(self.input[start_pos..self.position].as_ref())
@@ -64,54 +64,61 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Option<Token> {
+    pub fn next(&mut self) -> Token {
         self.skip_whitespace();
         let token = match self.ch as char {
-            // EOF
-            '\0' => None,
+            '\0' => Token::Eof,
             // TODO abstract peeking logic
             '=' => {
                 match self.peek_char() as char {
                     '=' => {
                         self.read_char();
-                        Some(Token::Eq)
+                        Token::Eq
                     }
-                    _ => Some(Token::Assign)
+                    _ => Token::Assign
                 }
             },
             '!' => {
                 match self.peek_char() as char {
                     '=' => {
                         self.read_char();
-                        Some(Token::Neq)
+                        Token::Neq
                     }
-                    _ => Some(Token::Bang)
+                    _ => Token::Bang
                 }
             },
-            '+' => Some(Token::Plus),
-            '-' => Some(Token::Minus),
-            '*' => Some(Token::Asterisk),
-            '/' => Some(Token::Slash),
-            '>' => Some(Token::Gt),
-            '<' => Some(Token::Lt),
-            ';' => Some(Token::Semicolon),
-            '(' => Some(Token::Lparen),
-            ')' => Some(Token::Rparen),
-            ',' => Some(Token::Comma),
-            '{' => Some(Token::Lbrace),
-            '}' => Some(Token::Rbrace),
+            '+' => Token::Plus,
+            '-' => Token::Minus,
+            '*' => Token::Asterisk,
+            '/' => Token::Slash,
+            '>' => Token::Gt,
+            '<' => Token::Lt,
+            ';' => Token::Semicolon,
+            '(' => Token::Lparen,
+            ')' => Token::Rparen,
+            ',' => Token::Comma,
+            '{' => Token::Lbrace,
+            '}' => Token::Rbrace,
             _ => {
-                if is_letter(self.ch) {
+                if Self::is_letter(self.ch) {
                     return Token::from_literal(self.read_identifier());
-                } else if is_digit(self.ch) {
-                    return Some(Token::Integer(self.read_integer()));
+                } else if Self::is_digit(self.ch) {
+                    return Token::Integer(self.read_integer());
                 } else {
-                    Some(Token::Illegal(self.ch as char))
+                    Token::Illegal(self.ch as char)
                 }
             },
         };
         self.read_char();
         token
+    }
+
+    fn is_letter(ch: u8) -> bool {
+        ch.is_ascii_alphabetic() || ch == b'_'
+    }
+
+    fn is_digit(ch: u8) -> bool {
+        ch.is_ascii_digit()
     }
 }
 
@@ -139,86 +146,86 @@ return false;
 10 == 10;
 10 != 9;".as_bytes();
 
-        let tests: Vec<Option<Token>> = vec![
-            Some(Token::Let),
-            Some(Token::Ident("five".to_string())),
-            Some(Token::Assign),
-            Some(Token::Integer(5)),
-            Some(Token::Semicolon),
-            Some(Token::Let),
-            Some(Token::Ident("ten".to_string())),
-            Some(Token::Assign),
-            Some(Token::Integer(10)),
-            Some(Token::Semicolon),
-            Some(Token::Let),
-            Some(Token::Ident("add".to_string())),
-            Some(Token::Assign),
-            Some(Token::Function),
-            Some(Token::Lparen),
-            Some(Token::Ident("x".to_string())),
-            Some(Token::Comma),
-            Some(Token::Ident("y".to_string())),
-            Some(Token::Rparen),
-            Some(Token::Lbrace),
-            Some(Token::Ident("x".to_string())),
-            Some(Token::Plus),
-            Some(Token::Ident("y".to_string())),
-            Some(Token::Semicolon),
-            Some(Token::Rbrace),
-            Some(Token::Semicolon),
-            Some(Token::Let),
-            Some(Token::Ident("result".to_string())),
-            Some(Token::Assign),
-            Some(Token::Ident("add".to_string())),
-            Some(Token::Lparen),
-            Some(Token::Ident("five".to_string())),
-            Some(Token::Comma),
-            Some(Token::Ident("ten".to_string())),
-            Some(Token::Rparen),
-            Some(Token::Semicolon),
-            Some(Token::Bang),
-            Some(Token::Minus),
-            Some(Token::Slash),
-            Some(Token::Asterisk),
-            Some(Token::Integer(5)),
-            Some(Token::Semicolon),
-            Some(Token::Integer(5)),
-            Some(Token::Lt),
-            Some(Token::Integer(10)),
-            Some(Token::Gt),
-            Some(Token::Integer(5)),
-            Some(Token::Semicolon),
-            Some(Token::If),
-            Some(Token::Lparen),
-            Some(Token::Integer(5)),
-            Some(Token::Lt),
-            Some(Token::Integer(10)),
-            Some(Token::Rparen),
-            Some(Token::Lbrace),
-            Some(Token::Return),
-            Some(Token::True),
-            Some(Token::Semicolon),
-            Some(Token::Rbrace),
-            Some(Token::Else),
-            Some(Token::Lbrace),
-            Some(Token::Return),
-            Some(Token::False),
-            Some(Token::Semicolon),
-            Some(Token::Rbrace),
-            Some(Token::Integer(10)),
-            Some(Token::Eq),
-            Some(Token::Integer(10)),
-            Some(Token::Semicolon),
-            Some(Token::Integer(10)),
-            Some(Token::Neq),
-            Some(Token::Integer(9)),
-            Some(Token::Semicolon),
-            None,
+        let tests = vec![
+            Token::Let,
+            Token::Ident("five".to_string()),
+            Token::Assign,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident("ten".to_string()),
+            Token::Assign,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident("add".to_string()),
+            Token::Assign,
+            Token::Function,
+            Token::Lparen,
+            Token::Ident("x".to_string()),
+            Token::Comma,
+            Token::Ident("y".to_string()),
+            Token::Rparen,
+            Token::Lbrace,
+            Token::Ident("x".to_string()),
+            Token::Plus,
+            Token::Ident("y".to_string()),
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident("result".to_string()),
+            Token::Assign,
+            Token::Ident("add".to_string()),
+            Token::Lparen,
+            Token::Ident("five".to_string()),
+            Token::Comma,
+            Token::Ident("ten".to_string()),
+            Token::Rparen,
+            Token::Semicolon,
+            Token::Bang,
+            Token::Minus,
+            Token::Slash,
+            Token::Asterisk,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Integer(5),
+            Token::Lt,
+            Token::Integer(10),
+            Token::Gt,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::If,
+            Token::Lparen,
+            Token::Integer(5),
+            Token::Lt,
+            Token::Integer(10),
+            Token::Rparen,
+            Token::Lbrace,
+            Token::Return,
+            Token::True,
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Else,
+            Token::Lbrace,
+            Token::Return,
+            Token::False,
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Integer(10),
+            Token::Eq,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Integer(10),
+            Token::Neq,
+            Token::Integer(9),
+            Token::Semicolon,
+            Token::Eof,
         ];
 
         let mut l = Lexer::new(input);
         for (i, tt) in tests.iter().enumerate() {
-            let token = l.next_token();
+            let token = l.next();
             assert_eq!(token, *tt, "tests[{}] - wrong token type. expected={:?}, got={:?}", i, tt, token);
         }
     }
