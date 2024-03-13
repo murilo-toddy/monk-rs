@@ -59,6 +59,11 @@ pub enum Expression {
         arguments: Vec<Identifier>,
         body: BlockStatement,
     },
+    Call {
+        token: Token, // Token::Lparen
+        function: Box<Expression>, // Idenifier or Function
+        arguments: Vec<Expression>,
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -69,7 +74,7 @@ pub struct BlockStatement {
 
 pub type Program = Vec<Statement>;
 
-#[derive(Eq, PartialEq, PartialOrd)]
+#[derive(PartialEq, PartialOrd, Debug)]
 pub enum Precedence {
     Lowest = 1,
     Equals = 2,      // ==

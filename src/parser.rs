@@ -157,7 +157,7 @@ impl<'a> Parser<'a> {
 
         let expression = self.parse_expression(Precedence::Lowest);
         if !self.expect_peek(&Token::Rparen) {
-            // TODO come back to this, this is awful
+            // TODO add error
             panic!("Missing right paren")
         }
         expression.unwrap()
@@ -216,6 +216,43 @@ impl<'a> Parser<'a> {
             left: Box::from(left),
             right: Box::from(self.parse_expression(precedence).unwrap()),
         }
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Expression> {
+        let mut arguments = Vec::new();
+
+        if self.peek_token_is(&Token::Rparen) {
+            self.next();
+            return arguments;
+        }
+
+        self.next();
+        // TODO add error possibility
+        arguments.push(self.parse_expression(Precedence::Lowest).unwrap());
+
+        println!("{:?}", arguments);
+        while self.peek_token_is(&Token::Comma) {
+            self.next();
+            self.next();
+            arguments.push(self.parse_expression(Precedence::Lowest).unwrap());
+        }
+
+        if !self.expect_peek(&Token::Rparen) {
+            // TODO parse error
+            panic!()
+        }
+
+        arguments
+    }
+
+    fn parse_call_expression(&mut self, left: Expression) -> Expression {
+        let s = Expression::Call {
+            token: self.current_token.clone(),
+            function: Box::new(left),
+            arguments: self.parse_call_arguments(),
+        };
+        println!("{:?}", s);
+        s
     }
 
     fn get_errors(&self) -> &Vec<ParseError> {
@@ -302,10 +339,11 @@ impl<'a> Parser<'a> {
 
     fn precedence_from_token(&self, token: &Token) -> Precedence {
         match token {
-            Token::Eq | Token::Neq => Precedence::Equals,
-            Token::Gt | Token::Lt => Precedence::LessGreater,
-            Token::Plus | Token::Minus => Precedence::Sum,
+            Token::Lparen => Precedence::Call,
             Token::Asterisk | Token::Slash => Precedence::Product,
+            Token::Plus | Token::Minus => Precedence::Sum,
+            Token::Gt | Token::Lt => Precedence::LessGreater,
+            Token::Eq | Token::Neq => Precedence::Equals,
             _ => Precedence::Lowest
         }
     }
@@ -335,10 +373,18 @@ impl<'a> Parser<'a> {
             },
         };
 
+        println!("{:?}", self.current_token);
+        println!("{:?} {:?}", precedence, self.peek_precedence());
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
+            println!("{:?}", self.current_token);
+            println!("{:?}", self.peek_token);
             
             // infix expressions
             left_expression = match self.peek_token {
+                Token::Lparen => {
+                    self.next();
+                    self.parse_call_expression(left_expression)
+                },
                 Token::Plus
                 | Token::Minus
                 | Token::Slash
@@ -756,6 +802,46 @@ mod parser_tests {
                                 }
                             ],
                         }
+                    }),
+                }
+            ],
+            program
+        );
+    }
+
+    #[test]
+    fn test_function_call() {
+        let input = "add(1, 2 * 3, 4 + 5)".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            vec![
+                Statement::Expression {
+                    token: Token::Ident("add".to_owned()),
+                    expression: Some(Expression::Call {
+                        token: Token::Lparen,
+                        function: Box::new(Expression::Identifier {
+                            token: Token::Ident("add".to_owned()),
+                            value: "add".to_owned(),
+                        }),
+                        arguments: vec![
+                            Expression::Integer { token: Token::Integer(1), value: 1 },
+                            Expression::Infix {
+                                token: Token::Asterisk,
+                                operator: "*".to_owned(),
+                                left: Box::new(Expression::Integer { token: Token::Integer(2), value: 2 }),
+                                right: Box::new(Expression::Integer { token: Token::Integer(3), value: 3 }),
+                            },
+                            Expression::Infix {
+                                token: Token::Plus,
+                                operator: "+".to_owned(),
+                                left: Box::new(Expression::Integer { token: Token::Integer(4), value: 4 }),
+                                right: Box::new(Expression::Integer { token: Token::Integer(5), value: 5 }),
+                            },
+                        ],
                     }),
                 }
             ],
