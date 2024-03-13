@@ -13,11 +13,12 @@ where
     for line in input.lines() {
         if let Ok(line) = line {
             let mut lexer = lexer::Lexer::new(line.as_bytes());
-            let token = lexer.next();
+            let mut token = lexer.next();
             while token != Token::Eof {
                 // TODO handle errors
                 output.write_all(format!("{:?}\n", token).as_bytes()).unwrap();
                 output.flush().unwrap();
+                token = lexer.next();
             }
         } else {
             eprintln!("ERROR: could not read input line");
