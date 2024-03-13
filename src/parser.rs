@@ -1,5 +1,4 @@
 use core::fmt;
-use std::mem::{discriminant, Discriminant};
 
 use crate::lexer::Lexer;
 use crate::token::Token;
@@ -14,17 +13,6 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "parse error: {}", self.message)
     }
-}
-
-#[derive(Eq, PartialEq, PartialOrd)]
-enum Precedence {
-    Lowest = 1,
-    Equals = 2,      // ==
-    LessGreater = 3, // > or <
-    Sum = 4,         // +
-    Product = 5,     // *
-    Prefix = 6,      // -x or !x
-    Call = 7,        // func(x)
 }
 
 struct Parser<'a> {
@@ -49,7 +37,7 @@ impl<'a> Parser<'a> {
         parser
     }
 
-    fn parse_function_literal(&mut self) -> Box<dyn Expression> {
+    fn parse_function_literal(&mut self) -> Expression {
         let function_token = self.current_token.clone();
         println!("{:?} {:?}", self.current_token, self.peek_token);
         if !self.expect_peek(&Token::Lparen) {
@@ -63,13 +51,13 @@ impl<'a> Parser<'a> {
             // TODO add parse error
             panic!("function literal should contain a block statement after arguments");
         }
-    
         let body = self.parse_block_statement();
-        return Box::from(FunctionLiteral {
+
+        Expression::Function {
             token: function_token,
             arguments,
             body,
-        });
+        }
     }
 
     fn parse_function_arguments(&mut self) -> Vec<Identifier> {
@@ -107,7 +95,7 @@ impl<'a> Parser<'a> {
         identifiers
     }
 
-    fn parse_if_expression(&mut self) -> Box<dyn Expression> {
+    fn parse_if_expression(&mut self) -> Expression {
         let current_token = self.current_token.clone();
         if !self.expect_peek(&Token::Lparen) {
             // TODO update this to be a parse error
@@ -138,12 +126,12 @@ impl<'a> Parser<'a> {
             alternative = Some(self.parse_block_statement());
         }
 
-        return Box::from(IfExpression {
+        Expression::If {
             token: current_token,
-            condition: condition.unwrap(),
+            condition: Box::from(condition.unwrap()),
             consequence,
             alternative,
-        });
+        }
     }
 
     fn parse_block_statement(&mut self) -> BlockStatement {
@@ -164,7 +152,7 @@ impl<'a> Parser<'a> {
         };
     }
 
-    fn parse_grouped_expression(&mut self) -> Box<dyn Expression> {
+    fn parse_grouped_expression(&mut self) -> Expression {
         self.next();
 
         let expression = self.parse_expression(Precedence::Lowest);
@@ -175,59 +163,59 @@ impl<'a> Parser<'a> {
         expression.unwrap()
     }
 
-    fn parse_identifier(&mut self) -> Box<dyn Expression> {
+    fn parse_identifier(&mut self) -> Expression {
         let value = match &self.current_token {
             Token::Ident(value) => value.clone(),
             _ => panic!("expected an identifier token"),
         };
-        Box::new(Identifier {
+        Expression::Identifier {
             token: self.current_token.clone(),
             value,
-        })
+        }
     }
 
-    fn parse_integer_literal(&mut self) -> Box<dyn Expression> {
+    fn parse_integer_literal(&mut self) -> Expression {
         let value = match self.current_token {
             Token::Integer(value) => value,
             _ => panic!("expected integer token"),
         };
-        Box::new(IntegerLiteral {
+        Expression::Integer {
             token: self.current_token.clone(),
             value,
-        })
+        }
     }
 
-    fn parse_boolean(&mut self) -> Box<dyn Expression> {
-        Box::from(Boolean {
+    fn parse_boolean(&mut self) -> Expression {
+        Expression::Boolean {
             token: self.current_token.clone(),
             value: self.current_token_is(Token::True),
-        })
+        }
     }
 
-    fn parse_prefix_expression(&mut self) -> Box<dyn Expression> {
+    fn parse_prefix_expression(&mut self) -> Expression {
         let current_token = self.current_token.clone();
         self.next();
         
-        Box::from(PrefixExpression {
+        Expression::Prefix {
             token: current_token.clone(),
             operator: current_token.to_string(),
-            right: self.parse_expression(Precedence::Prefix).unwrap_or_else(||
+            right: Box::from(self.parse_expression(Precedence::Prefix).unwrap_or_else(||
                 panic!("prefix expressions should have right")
-            ),
-        })
+            )),
+        }
     }
 
-    fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> Box<dyn Expression> {
+    fn parse_infix_expression(&mut self, left: Expression) -> Expression {
         let current_token = self.current_token.clone();
         let precedence = self.current_precedence();
         self.next();
 
-        Box::from(InfixExpression {
+        Expression::Infix {
             token: current_token.clone(),
             operator: current_token.to_string(),
-            left,
-            right: self.parse_expression(precedence).unwrap(),
-        })
+            left: Box::from(left),
+            right: Box::from(self.parse_expression(precedence).unwrap()),
+        }
     }
 
     fn get_errors(&self) -> &Vec<ParseError> {
@@ -265,15 +253,9 @@ impl<'a> Parser<'a> {
 
     fn current_token_is(&mut self, token: Token) -> bool {
         self.current_token == token
-//         if let Some(current_token) = &self.current_token {
-//             if self.token_types_match(current_token, &token) {
-//                 return true;
-//             }
-//         }
-//         false
     }
 
-    fn parse_let_statement(&mut self) -> Option<Box<LetStatement>> {
+    fn parse_let_statement(&mut self) -> Option<Statement> {
         let token = self.current_token.clone();
 
         // TODO understand the need of this clone
@@ -287,19 +269,6 @@ impl<'a> Parser<'a> {
             },
             _ => return None,
         };
-//         if !self.expect_peek(&Token::Ident(String::from(""))) {
-//             return None;
-//         }
-
-//         let identifier = match self.current_token.take() {
-//             Some(token) => {
-//                 match token.clone() {
-//                     Token::Ident(value) => Identifier { token, value },
-//                     _ => panic!("branch cannot happen")
-//                 }
-//             },
-//             _ => panic!("branch cannot happen")
-//         };
 
         if !self.expect_peek(&Token::Assign) {
             return None;
@@ -310,14 +279,14 @@ impl<'a> Parser<'a> {
             self.next();
         }
 
-        Some(Box::from(LetStatement {
+        Some(Statement::Let {
             name: identifier,
             token,
             value: None,
-        }))
+        })
     }
 
-    fn parse_return_statement(&mut self) -> Option<Box<ReturnStatement>> {
+    fn parse_return_statement(&mut self) -> Option<Statement> {
         let token = self.current_token.clone();
         self.next();
 
@@ -325,10 +294,10 @@ impl<'a> Parser<'a> {
         while !self.current_token_is(Token::Semicolon) {
             self.next();
         }
-        Some(Box::from(ReturnStatement {
+        Some(Statement::Return {
             token,
             value: None,
-        }))
+        })
     }
 
     fn precedence_from_token(&self, token: &Token) -> Precedence {
@@ -349,7 +318,7 @@ impl<'a> Parser<'a> {
         self.precedence_from_token(&self.current_token)
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Option<Box<dyn Expression>> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
         
         // prefix expressions
         let mut left_expression = match &self.current_token {
@@ -389,28 +358,28 @@ impl<'a> Parser<'a> {
         Some(left_expression)
     }
 
-    fn parse_expression_statement(&mut self) -> Option<Box<ExpressionStatement>> {
+    fn parse_expression_statement(&mut self) -> Option<Statement> {
         let expression_token = self.current_token.clone();
         let expression = self.parse_expression(Precedence::Lowest);
 
         if self.peek_token_is(&Token::Semicolon) {
             self.next();
         }
-        Some(Box::from(ExpressionStatement {
+        Some(Statement::Expression {
             token: expression_token,
             expression,
-        }))
+        })
     }
 
-    fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
+    fn parse_statement(&mut self) -> Option<Statement> {
         match self.current_token {
-            Token::Let => self.parse_let_statement().map(|s| s as Box<dyn Statement>),
-            Token::Return => self.parse_return_statement().map(|s| s as Box<dyn Statement>),
-            _ => self.parse_expression_statement().map(|s| s as Box<dyn Statement>),
+            Token::Let => self.parse_let_statement(),
+            Token::Return => self.parse_return_statement(),
+            _ => self.parse_expression_statement(),
         }
     }
 
-    pub fn parse_program(&mut self) -> Program {
+    pub fn parse(&mut self) -> Program {
         let mut statements = Vec::new();
         while self.current_token != Token::Eof {
             if let Some(statement) = self.parse_statement() {
@@ -418,7 +387,7 @@ impl<'a> Parser<'a> {
             }
             self.next();
         }
-        Program { statements }
+        statements
     }
 }
 
@@ -443,377 +412,316 @@ mod parser_tests {
     #[test]
     fn test_let_statements() {
         let input = "let x = 5;
-let y = 10;
-let foobar = 838383;".as_bytes();
+            let y = 10;
+            let foobar = 838383;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = parser.parse();
         check_parse_errors(parser);
 
-        if program.statements.len() != 3 {
-            panic!("expected program to contain 3 elements but got {}", program.statements.len())
-        }
-
-        let expected_identifiers = vec![
-            "x".to_string(),
-            "y".to_string(),
-            "foobar".to_string(),
-        ];
-
-        for (i, expected_identifier) in expected_identifiers.iter().enumerate() {
-            match program.statements.get(i) {
-                Some(statement) => {
-                    if *statement.get_token() != Token::Let {
-                        panic!("expected statement with token <Token::Let> but got <{:?}>", statement.get_token());
-                    }
-                    match statement.as_any().downcast_ref::<LetStatement>() {
-                        None => panic!("expected LetStatement but got {:?}", statement),
-                        Some(let_statement) => {
-                            if let_statement.name.value != *expected_identifier {
-                                panic!("expected identifier <{}> for let statement but got <{}>", *expected_identifier, let_statement.name.value)
-                            }
-                        },
-                    }
-                }
-                None => panic!("index out of bounds fo statements"),
-            }
-        }
+        assert_eq!(
+            vec![
+                Statement::Let {
+                    token: Token::Let,
+                    name: Identifier { token: Token::Ident("x".to_owned()), value: "x".to_owned() },
+                    value: None,
+                },
+                Statement::Let {
+                    token: Token::Let,
+                    name: Identifier { token: Token::Ident("y".to_owned()), value: "y".to_owned() },
+                    value: None,
+                },
+                Statement::Let {
+                    token: Token::Let,
+                    name: Identifier { token: Token::Ident("foobar".to_owned()), value: "foobar".to_owned() },
+                    value: None,
+                },
+            ],
+            program
+        );
     }
 
     #[test]
     fn test_return_statements() {
         let input = "return 5;
-return 10;
-return 838383;".as_bytes();
+            return 10;
+            return 838383;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = parser.parse();
         check_parse_errors(parser);
 
-        if program.statements.len() != 3 {
-            panic!("expected program to contain 3 elements but got {}", program.statements.len())
-        }
-
-        for statement in program.statements {
-            if *statement.get_token() != Token::Return {
-                panic!("expected statement with token <Token::Return> but got <{:?}>", statement.get_token());
-            }
-            if statement.as_any().downcast_ref::<ReturnStatement>().is_none() {
-                panic!("expected ReturnStatement but got {:?}", statement);
-            }
-        }
+        assert_eq!(
+            vec![
+                Statement::Return {
+                    token: Token::Return,
+                    value: None,
+                },
+                Statement::Return{
+                    token: Token::Return,
+                    value: None,
+                },
+                Statement::Return {
+                    token: Token::Return,
+                    value: None,
+                },
+            ],
+            program
+        );
     }
 
     #[test]
     fn test_identifier_expression() {
         let input = "foobar;".as_bytes();
+        let expected_value = "foobar".to_owned();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = parser.parse();
         check_parse_errors(parser);
 
-        if program.statements.len() != 1 {
-            panic!("expected program to contain 1 elements but got {}", program.statements.len())
-        }
-
-        let statement = program.statements.first().unwrap();
-        let expression = &statement
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
-            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-            .expression;
-
-        if let Some(expression) = expression {
-            let identifier = expression
-                .as_any()
-                .downcast_ref::<Identifier>()
-                .unwrap_or_else(|| panic!("expected Identifier"));
-
-            assert_eq!(identifier.value, "foobar");
-            match &identifier.token {
-                Token::Ident(value) => assert_eq!(value, "foobar"),
-                _ => panic!("identifier contains token with different type {:?}", identifier.token),
-            }
-        }
+        assert_eq!(
+            vec![
+                Statement::Expression {
+                    token: Token::Ident(expected_value.clone()),
+                    expression: Some(Expression::Identifier {
+                        token: Token::Ident(expected_value.clone()),
+                        value: expected_value,
+                    })
+                },
+            ],
+            program
+        );
     }
 
-    // TODO refactor test structure
     #[test]
     fn test_integer_literal_expression() {
         let input = "5;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = parser.parse();
         check_parse_errors(parser);
 
-        if program.statements.len() != 1 {
-            panic!("expected program to contain 1 elements but got {}", program.statements.len())
-        }
-
-        let statement = program.statements.first().unwrap();
-        let expression = &statement
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
-            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-            .expression;
-
-        if let Some(expression) = expression {
-            let integer = expression
-                .as_any()
-                .downcast_ref::<IntegerLiteral>()
-                .unwrap_or_else(|| panic!("expected IntegerLiteral"));
-
-            assert_eq!(integer.value, 5);
-            match &integer.token {
-                Token::Integer(value) => assert_eq!(*value, 5),
-                _ => panic!("integer contains token with different type {:?}", integer .token),
-            }
-        }
+        assert_eq!(
+            vec![
+                Statement::Expression {
+                    token: Token::Integer(5),
+                    expression: Some(Expression::Integer {
+                        token: Token::Integer(5),
+                        value: 5,
+                    })
+                },
+            ],
+            program
+        );
     }
 
     #[test]
     fn test_boolean_expression() {
-        let tests = [("true;", true), ("false;", false)];
+        let input = "true; false;".as_bytes();
         
-        for (input, expected) in tests {
-            let lexer = Lexer::new(input.as_bytes());
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
-            check_parse_errors(parser);
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
 
-            if program.statements.len() != 1 {
-                panic!("expected program to contain 1 elements but got {}", program.statements.len())
-            }
-
-            let statement = program.statements.first().unwrap();
-            let expression = &statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-                .expression;
-
-            if let Some(expression) = expression {
-                let boolean = expression
-                    .as_any()
-                    .downcast_ref::<Boolean>()
-                    .unwrap_or_else(|| panic!("expected Boolean"));
-
-                match &boolean.token {
-                    Token::True => assert_eq!(expected, true),
-                    Token::False => assert_eq!(expected, false),
-                    _ => panic!("boolean contains token with different type {:?}", boolean.token),
-                }
-                assert_eq!(boolean.value, expected);
-            }
-        }
+        assert_eq!(
+            vec![
+                Statement::Expression {
+                    token: Token::True,
+                    expression: Some(Expression::Boolean {
+                        token: Token::True ,
+                        value: true,
+                    })
+                },
+                Statement::Expression {
+                    token: Token::False,
+                    expression: Some(Expression::Boolean {
+                        token: Token::False,
+                        value: false,
+                    })
+                },
+            ],
+            program
+        );
     }
 
     #[test]
     fn test_prefix_expression() {
         let tests = vec![
-            ("!5;", "!", 5),
-            ("-15;", "-", 15),
+            (
+                "!5;",
+                vec![
+                    Statement::Expression {
+                        token: Token::Bang,
+                        expression: Some(Expression::Prefix {
+                            token: Token::Bang,
+                            operator: "!".to_owned(),
+                            right: Box::from(Expression::Integer {
+                                token: Token::Integer(5),
+                                value: 5,
+                            }),
+                        })
+                    },
+                ],
+            ),
+            (
+                "-15;",
+                vec![
+                    Statement::Expression {
+                        token: Token::Minus,
+                        expression: Some(Expression::Prefix {
+                            token: Token::Minus,
+                            operator: "-".to_owned(),
+                            right: Box::from(Expression::Integer {
+                                token: Token::Integer(15),
+                                value: 15,
+                            }),
+                        })
+                    },
+                ],
+            )
         ];
 
-        for (input, op, int) in tests {
+        for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
             let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
+            let program = parser.parse();
             check_parse_errors(parser);
 
-            if program.statements.len() != 1 {
-                panic!("expected program to contain 1 elements but got {}", program.statements.len())
-            }
-
-            let statement = program.statements.first().unwrap();
-            let expression = &statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-                .expression;
-
-            if let Some(expression) = expression {
-                let prefix = expression
-                    .as_any()
-                    .downcast_ref::<PrefixExpression>()
-                    .unwrap_or_else(|| panic!("expected PrefixExpression"));
-
-                assert_eq!(prefix.operator, op);
-                test_integer_literal(&prefix.right, int);
-            }
+            assert_eq!(expected, program);
         }
+    }
+
+    fn infix_template(left: i64, op: &str, op_token: Token, right: i64) -> Vec<Statement> {
+        vec![Statement::Expression {
+            token: Token::Integer(left),
+            expression: Some(Expression::Infix {
+                token: op_token,
+                operator: op.to_owned(),
+                left: Box::from(Expression::Integer {
+                    token: Token::Integer(left),
+                    value: 5,
+                }),
+                right: Box::from(Expression::Integer {
+                    token: Token::Integer(right),
+                    value: right,
+                }),
+            })
+        }]
     }
 
     #[test]
     fn test_infix_expression() {
         let tests = vec![
-            ("5 + 5;", 5, "+", 5),
-            ("5 - 5;", 5, "-", 5),
-            ("5 * 5;", 5, "*", 5),
-            ("5 / 5;", 5, "/", 5),
-            ("5 > 5;", 5, ">", 5),
-            ("5 < 5;", 5, "<", 5),
-            ("5 == 5;", 5, "==", 5),
-            ("5 != 5;", 5, "!=", 5),
+            ("5 + 5;", infix_template(5, "+", Token::Plus, 5)),
+            ("5 - 5;", infix_template(5, "-", Token::Minus, 5)),
+            ("5 * 5;", infix_template(5, "*", Token::Asterisk, 5)),
+            ("5 / 5;", infix_template(5, "/", Token::Slash, 5)),
+            ("5 > 5;", infix_template(5, ">", Token::Gt, 5)),
+            ("5 < 5;", infix_template(5, "<", Token::Lt, 5)),
+            ("5 == 5;", infix_template(5, "==", Token::Eq, 5)),
+            ("5 != 5;", infix_template(5, "!=", Token::Neq, 5)),
         ];
 
-        for (input, left, op, right) in tests {
+        for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
             let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
+            let program = parser.parse();
             check_parse_errors(parser);
 
-            if program.statements.len() != 1 {
-                panic!("expected program to contain 1 elements but got {}", program.statements.len())
-            }
-
-            let statement = program.statements.first().unwrap();
-            let expression = &statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-                .expression;
-
-            if let Some(expression) = expression {
-                let infix = expression
-                    .as_any()
-                    .downcast_ref::<InfixExpression>()
-                    .unwrap_or_else(|| panic!("expected InfixExpression"));
-
-                test_integer_literal(&infix.left, left);
-                assert_eq!(infix.operator, op);
-                test_integer_literal(&infix.right, right);
-            }
+            assert_eq!(expected, program);
         }
     }
-
-    fn test_integer_literal(exp: &Box<dyn Expression>, int: i64) {
-        let int_exp = &exp
-            .as_any()
-            .downcast_ref::<IntegerLiteral>()
-            .unwrap_or_else(|| panic!("expected IntegerLiteral"));
-        
-        assert_eq!(int_exp.value, int);
-        assert_eq!(int_exp.token, Token::Integer(int));
-    }
-
+ 
     #[test]
     fn test_if_statement() {
         let input = "if (x < y) { x }".as_bytes();
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = parser.parse();
         check_parse_errors(parser);
 
-        assert_eq!(program.statements.len(), 1,
-            "expected program to contain 1 elements but got {}", program.statements.len());
-
-        let statement = program.statements.first().unwrap();
-        let expression = &statement
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
-            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-            .expression;
-
-        if let Some(expression) = expression {
-            let if_expression = expression
-                .as_any()
-                .downcast_ref::<IfExpression>()
-                .unwrap_or_else(|| panic!("expected IfExpression"));
-
-            let condition = if_expression 
-                .condition
-                .as_any()
-                .downcast_ref::<InfixExpression>()
-                .unwrap_or_else(|| panic!("expected InfixExpression"));
-
-            check_identifier_equals(&condition.left, "x");
-            assert_eq!(condition.operator, "<");
-            check_identifier_equals(&condition.right, "y");
-            
-            assert_eq!(if_expression.consequence.statements.len(), 1, 
-                       "consequence should have 1 statement but got {}", if_expression.consequence.statements.len());
-
-            let consequence = if_expression 
-                .consequence
-                .statements
-                .first()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("expected ExpressionStatement"));
-
-            check_identifier_equals(consequence.expression.as_ref().unwrap(), "x");
-
-            assert!(if_expression.alternative.is_none(), "IfStatement should have no alternative");
-        }
+        assert_eq!(
+            vec![Statement::Expression {
+                token: Token::If,
+                expression: Some(Expression::If {
+                    token: Token::If,
+                    condition: Box::from(Expression::Infix {
+                        token: Token::Lt,
+                        operator: "<".to_owned(),
+                        left: Box::from(Expression::Identifier { token: Token::Ident("x".to_owned()), value: "x".to_owned() }),
+                        right: Box::from(Expression::Identifier { token: Token::Ident("y".to_owned()), value: "y".to_owned() }),
+                    }),
+                    consequence: BlockStatement {
+                        token: Token::Lbrace,
+                        statements: vec![
+                            Statement::Expression {
+                                token: Token::Ident("x".to_owned()), 
+                                expression: Some(Expression::Identifier {
+                                    token: Token::Ident("x".to_owned()), 
+                                    value: "x".to_owned() ,
+                                }),
+                            },
+                        ],
+                    },
+                    alternative: None,
+                })
+           }],
+            program
+        );
     }
-
+ 
     #[test]
     fn test_if_else_statement() {
         let input = "if (x < y) { x } else { y }".as_bytes();
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = parser.parse();
         check_parse_errors(parser);
 
-        if program.statements.len() != 1 {
-            panic!("expected program to contain 1 elements but got {}", program.statements.len())
-        }
-
-        let statement = program.statements.first().unwrap();
-        let expression = &statement
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
-            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-            .expression;
-
-        if let Some(expression) = expression {
-            let if_expression = expression
-                .as_any()
-                .downcast_ref::<IfExpression>()
-                .unwrap_or_else(|| panic!("expected IfExpression"));
-
-            let condition = if_expression 
-                .condition
-                .as_any()
-                .downcast_ref::<InfixExpression>()
-                .unwrap_or_else(|| panic!("expected InfixExpression"));
-
-            check_identifier_equals(&condition.left, "x");
-            assert_eq!(condition.operator, "<");
-            check_identifier_equals(&condition.right, "y");
-            
-            assert_eq!(if_expression.consequence.statements.len(), 1, 
-                       "consequence should have 1 statement but got {}", if_expression.consequence.statements.len());
-
-            let consequence = if_expression 
-                .consequence
-                .statements
-                .first()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("expected ExpressionStatement"));
-            check_identifier_equals(consequence.expression.as_ref().unwrap(), "x");
-
-            assert!(if_expression.alternative.is_some());
-            let alternative = if_expression 
-                .alternative
-                .as_ref()
-                .unwrap()
-                .statements
-                .first()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("expected ExpressionStatement"));
-            check_identifier_equals(alternative.expression.as_ref().unwrap(), "y");
-        }
+        assert_eq!(
+            vec![Statement::Expression {
+                token: Token::If,
+                expression: Some(Expression::If {
+                    token: Token::If,
+                    condition: Box::from(Expression::Infix {
+                        token: Token::Lt,
+                        operator: "<".to_owned(),
+                        left: Box::from(Expression::Identifier { token: Token::Ident("x".to_owned()), value: "x".to_owned() }),
+                        right: Box::from(Expression::Identifier { token: Token::Ident("y".to_owned()), value: "y".to_owned() }),
+                    }),
+                    consequence: BlockStatement {
+                        token: Token::Lbrace,
+                        statements: vec![
+                            Statement::Expression {
+                                token: Token::Ident("x".to_owned()), 
+                                expression: Some(Expression::Identifier {
+                                    token: Token::Ident("x".to_owned()), 
+                                    value: "x".to_owned() ,
+                                }),
+                            },
+                        ],
+                    },
+                    alternative: Some(BlockStatement {
+                        token: Token::Lbrace,
+                        statements: vec![
+                            Statement::Expression {
+                                token: Token::Ident("y".to_owned()), 
+                                expression: Some(Expression::Identifier {
+                                    token: Token::Ident("y".to_owned()), 
+                                    value: "y".to_owned(),
+                                }),
+                            },
+                        ],
+                    }),
+                })
+           }],
+            program
+        );
     }
 
     #[test]
@@ -821,120 +729,375 @@ return 838383;".as_bytes();
         let input = "fn(x, y) { x + y; }".as_bytes();
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let program = parser.parse();
         check_parse_errors(parser);
 
-        if program.statements.len() != 1 {
-            panic!("expected program to contain 1 elements but got {}", program.statements.len())
-        }
-
-        let statement = program.statements.first().unwrap();
-        let expression = &statement
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
-            .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", statement))
-            .expression;
-
-        if let Some(expression) = expression {
-            let func = expression
-                .as_any()
-                .downcast_ref::<FunctionLiteral>()
-                .unwrap_or_else(|| panic!("expected FunctionLiteral"));
-
-            assert_eq!(func.arguments.len(), 2, "function must contain 2 arguments");
-            let first_arg = Box::from(func.arguments[0].clone()) as Box<dyn Expression>;
-            check_identifier_equals(&first_arg, "x");
-            let second_arg = Box::from(func.arguments[1].clone()) as Box<dyn Expression>;
-            check_identifier_equals(&second_arg, "y");
-            
-            assert_eq!(func.body.statements.len(), 1, 
-                       "function body should have 1 statement but got {}", func.body.statements.len());
-
-            let statement = func
-                .body
-                .statements
-                .first()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("expected ExpressionStatement but got {:?}", func));
-
-
-            let infix = statement
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<InfixExpression>()
-                .unwrap_or_else(|| panic!("expected InfixExpression but got {:?}", func));
-
-            check_identifier_equals(&infix.left, "x");
-            assert_eq!(infix.operator, "+");
-            check_identifier_equals(&infix.right, "y");
-        }
-    }
-
-    fn check_identifier_equals(actual: &Box<dyn Expression>, expected: &str) {
-        let actual_ident = actual 
-            .as_any()
-            .downcast_ref::<Identifier>()
-            .unwrap_or_else(|| panic!("expected Identifer"));
-
-        assert_eq!(actual_ident.value, expected.to_owned());
-    }
-
-    #[test]
-    fn test_operator_precedence() {
-        let tests = vec![
-            ("-a * b", "((-a) * b)"),
-            ("!-a", "(!(-a))"),
-            ("a + b + c", "((a + b) + c)"),
-            ("a + b - c", "((a + b) - c)"),
-            ("a * b * c", "((a * b) * c)"),
-            ("a * b / c", "((a * b) / c)"),
-            ("a + b / c", "(a + (b / c))"),
-            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
-            ("3 + 4;; -5 * 5", "(3 + 4)((-5) * 5)"),
-            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
-            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
-            ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
-            ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
-            ("true", "true"),
-            ("3 > 5 == false", "((3 > 5) == false)"),
-            ("3 < 5 == true", "((3 < 5) == true)"),
-            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
-            ("(5 + 5) * 2", "((5 + 5) * 2)"),
-            ("2 / (5 + 5)", "(2 / (5 + 5))"),
-            ("-(5 + 5)", "(-(5 + 5))"),
-        ];
-        for (input, expected) in tests {
-            let lexer = Lexer::new(input.as_bytes());
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
-            check_parse_errors(parser);
-            assert_eq!(program.to_string(), expected);
-        }
-    }
-
-    #[test]
-    fn test_string() {
-        let program = Program {
-            statements: vec![
-                Box::from(LetStatement {
-                    token: Token::Let,
-                    name: Identifier {
-                        token: Token::Ident("my_var".to_owned()),
-                        value: "my_var".to_owned(),
-                    },
-                    value: Some(Box::from(Identifier {
-                        token: Token::Ident("another_var".to_owned()),
-                        value: "another_var".to_owned(),
-                    })),
-                }) as Box<dyn Statement>,
+        assert_eq!(
+            vec![
+                Statement::Expression {
+                    token: Token::Function,
+                    expression: Some(Expression::Function {
+                        token: Token::Function,
+                        arguments: vec![
+                            Identifier { token: Token::Ident("x".to_owned()), value: "x".to_owned() },
+                            Identifier { token: Token::Ident("y".to_owned()), value: "y".to_owned() },
+                        ],
+                        body: BlockStatement {
+                            token: Token::Lbrace,
+                            statements: vec![
+                                Statement::Expression {
+                                    token: Token::Ident("x".to_owned()),
+                                    expression: Some(Expression::Infix {
+                                        token: Token::Plus,
+                                        operator: "+".to_owned(),
+                                        left: Box::new(Expression::Identifier { token: Token::Ident("x".to_owned()), value: "x".to_owned() }),
+                                        right: Box::new(Expression::Identifier { token: Token::Ident("y".to_owned()), value: "y".to_owned() }),
+                                    })
+                                }
+                            ],
+                        }
+                    }),
+                }
             ],
-        };
-
-        assert_eq!(program.to_string(), "let my_var = another_var;", "to_string() method should work properly")
+            program
+        );
     }
+
+// TODO move tests to new structure
+//    #[test]
+//    fn test_operator_precedence() {
+//        let tests = vec![
+//            (
+//                "-a * b",
+//                Statement::Expression { 
+//                    token: Token::Minus,
+//                    expression: Some(Expression::Infix {
+//                        token: Infix::Multiply,
+//                        operator: "*".to_owned(),
+//                        left: Box::new(Expression::Prefix(
+//                            token: Prefix::Minus,
+//                            Box::new(Expression::Ident(Ident(String::from("a")))),
+//                        )),
+//                        right: Box::new(Expression::Ident(Ident(String::from("b")))),
+//                    }),
+//                },
+//            ),
+//            (
+//                "!-a",
+//                Statement::Expression {
+//                    expression: Expression::Prefix {
+//                        Prefix::Not,
+//                        Box::new(Expression::Prefix(
+//                            Prefix::Minus,
+//                            Box::new(Expression::Ident(Ident(String::from("a")))),
+//                        )),
+//                    }
+//                },
+//            ),
+//            (
+//                "a + b + c",
+//                Statement::Expression {
+//                    expression: Expression::Infix {
+//                        Infix::Plus,
+//                        Box::new(Expression::Infix(
+//                            Infix::Plus,
+//                            Box::new(Expression::Ident(Ident(String::from("a")))),
+//                            Box::new(Expression::Ident(Ident(String::from("b")))),
+//                        )),
+//                        Box::new(Expression::Ident(Ident(String::from("c")))),
+//                    }
+//                },
+//            ),
+//            (
+//                "a + b - c",
+//                Statement::Expression {
+//                    expression: Expression::Infix {
+//                        Infix::Minus,
+//                        Box::new(Expression::Infix(
+//                            Infix::Plus,
+//                            Box::new(Expression::Ident(Ident(String::from("a")))),
+//                            Box::new(Expression::Ident(Ident(String::from("b")))),
+//                        )),
+//                        Box::new(Expression::Ident(Ident(String::from("c")))),
+//                    }
+//                },
+//            ),
+//            (
+//                "a * b * c",
+//                Statement::Expression {
+//                    expression: Expression::Infix {
+//                        Infix::Multiply,
+//                        Box::new(Expression::Infix(
+//                            Infix::Multiply,
+//                            Box::new(Expression::Ident(Ident(String::from("a")))),
+//                            Box::new(Expression::Ident(Ident(String::from("b")))),
+//                        )),
+//                        Box::new(Expression::Ident(Ident(String::from("c")))),
+//                    },
+//                },
+//            ),
+//            (
+//                "a * b / c",
+//                Statement::Expression {
+//                    expression: Expression::Infix {
+//                        Infix::Divide,
+//                        Box::new(Expression::Infix(
+//                            Infix::Multiply,
+//                            Box::new(Expression::Ident(Ident(String::from("a")))),
+//                            Box::new(Expression::Ident(Ident(String::from("b")))),
+//                        )),
+//                        Box::new(Expression::Ident(Ident(String::from("c")))),
+//                    },
+//                },
+//            ),
+//            (
+//                "a + b / c",
+//                Statement::Expression {
+//                    expression: Expression::Infix {
+//                        Infix::Plus,
+//                        Box::new(Expression::Ident(Ident(String::from("a")))),
+//                        Box::new(Expression::Infix(
+//                            Infix::Divide,
+//                            Box::new(Expression::Ident(Ident(String::from("b")))),
+//                            Box::new(Expression::Ident(Ident(String::from("c")))),
+//                        )),
+//                    }
+//                },
+//            ),
+//            (
+//                "a + b * c + d / e - f",
+//                Statement::Expression {
+//                    expression: Expression::Infix {
+//                        Infix::Minus,
+//                        Box::new(Expression::Infix(
+//                            Infix::Plus,
+//                            Box::new(Expression::Infix(
+//                                Infix::Plus,
+//                                Box::new(Expression::Ident(Ident(String::from("a")))),
+//                                Box::new(Expression::Infix(
+//                                    Infix::Multiply,
+//                                    Box::new(Expression::Ident(Ident(String::from("b")))),
+//                                    Box::new(Expression::Ident(Ident(String::from("c")))),
+//                                )),
+//                            )),
+//                            Box::new(Expression::Infix(
+//                                Infix::Divide,
+//                                Box::new(Expression::Ident(Ident(String::from("d")))),
+//                                Box::new(Expression::Ident(Ident(String::from("e")))),
+//                            )),
+//                        )),
+//                        Box::new(Expression::Ident(Ident(String::from("f")))),
+//                    },
+//                },
+//            ),
+//            (
+//                "5 > 4 == 3 < 4",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Equal,
+//                    Box::new(Expression::Infix(
+//                        Infix::GreaterThan,
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                    Box::new(Expression::Infix(
+//                        Infix::LessThan,
+//                        Box::new(Expression::Literal(Literal::Int(3))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                )},
+//            ),
+//            (
+//                "5 < 4 != 3 > 4",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::NotEqual,
+//                    Box::new(Expression::Infix(
+//                        Infix::LessThan,
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                    Box::new(Expression::Infix(
+//                        Infix::GreaterThan,
+//                        Box::new(Expression::Literal(Literal::Int(3))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                )},
+//            ),
+//            (
+//                "5 >= 4 == 3 <= 4",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Equal,
+//                    Box::new(Expression::Infix(
+//                        Infix::GreaterThanEqual,
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                    Box::new(Expression::Infix(
+//                        Infix::LessThanEqual,
+//                        Box::new(Expression::Literal(Literal::Int(3))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                )},
+//            ),
+//            (
+//                "5 <= 4 != 3 >= 4",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::NotEqual,
+//                    Box::new(Expression::Infix(
+//                        Infix::LessThanEqual,
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                    Box::new(Expression::Infix(
+//                        Infix::GreaterThanEqual,
+//                        Box::new(Expression::Literal(Literal::Int(3))),
+//                        Box::new(Expression::Literal(Literal::Int(4))),
+//                    )),
+//                )},
+//            ),
+//            (
+//                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Equal,
+//                    Box::new(Expression::Infix(
+//                        Infix::Plus,
+//                        Box::new(Expression::Literal(Literal::Int(3))),
+//                        Box::new(Expression::Infix(
+//                            Infix::Multiply,
+//                            Box::new(Expression::Literal(Literal::Int(4))),
+//                            Box::new(Expression::Literal(Literal::Int(5))),
+//                        )),
+//                    )),
+//                    Box::new(Expression::Infix(
+//                        Infix::Plus,
+//                        Box::new(Expression::Infix(
+//                            Infix::Multiply,
+//                            Box::new(Expression::Literal(Literal::Int(3))),
+//                            Box::new(Expression::Literal(Literal::Int(1))),
+//                        )),
+//                        Box::new(Expression::Infix(
+//                            Infix::Multiply,
+//                            Box::new(Expression::Literal(Literal::Int(4))),
+//                            Box::new(Expression::Literal(Literal::Int(5))),
+//                        )),
+//                    )),
+//                )},
+//            ),
+//            ("true", Statement::Expression {Expression::Literal(Literal::Bool(true))}),
+//            ("false", Statement::Expression {Expression::Literal(Literal::Bool(false))}),
+//            (
+//                "3 > 5 == false",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Equal,
+//                    Box::new(Expression::Infix(
+//                        Infix::GreaterThan,
+//                        Box::new(Expression::Literal(Literal::Int(3))),
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                    )),
+//                    Box::new(Expression::Literal(Literal::Bool(false))),
+//                )},
+//            ),
+//            (
+//                "3 < 5 == true",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Equal,
+//                    Box::new(Expression::Infix(
+//                        Infix::LessThan,
+//                        Box::new(Expression::Literal(Literal::Int(3))),
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                    )),
+//                    Box::new(Expression::Literal(Literal::Bool(true))),
+//                )},
+//            ),
+//            (
+//                "1 + (2 + 3) + 4",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Plus,
+//                    Box::new(Expression::Infix(
+//                        Infix::Plus,
+//                        Box::new(Expression::Literal(Literal::Int(1))),
+//                        Box::new(Expression::Infix(
+//                            Infix::Plus,
+//                            Box::new(Expression::Literal(Literal::Int(2))),
+//                            Box::new(Expression::Literal(Literal::Int(3))),
+//                        )),
+//                    )),
+//                    Box::new(Expression::Literal(Literal::Int(4))),
+//                )},
+//            ),
+//            (
+//                "(5 + 5) * 2",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Multiply,
+//                    Box::new(Expression::Infix(
+//                        Infix::Plus,
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                    )),
+//                    Box::new(Expression::Literal(Literal::Int(2))),
+//                )},
+//            ),
+//            (
+//                "2 / (5 + 5)",
+//                Statement::Expression {Expression::Infix(
+//                    Infix::Divide,
+//                    Box::new(Expression::Literal(Literal::Int(2))),
+//                    Box::new(Expression::Infix(
+//                        Infix::Plus,
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                    )),
+//                )},
+//            ),
+//            (
+//                "-(5 + 5)",
+//                Statement::Expression {Expression::Prefix(
+//                    Prefix::Minus,
+//                    Box::new(Expression::Infix(
+//                        Infix::Plus,
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                        Box::new(Expression::Literal(Literal::Int(5))),
+//                    )),
+//                )},
+//            ),
+//            (
+//                "!(true == true)",
+//                Statement::Expression {Expression::Prefix(
+//                    Prefix::Not,
+//                    Box::new(Expression::Infix(
+//                        Infix::Equal,
+//                        Box::new(Expression::Literal(Literal::Bool(true))),
+//                        Box::new(Expression::Literal(Literal::Bool(true))),
+//                    )),
+//                )},
+//            ),
+//        ];
+//        for (input, expected) in tests {
+//            let lexer = Lexer::new(input.as_bytes());
+//            let mut parser = Parser::new(lexer);
+//            let program = parser.parse();
+//            check_parse_errors(parser);
+//
+//            assert_eq!(program, expected);
+//        }
+//    }
+
+//     TODO implement to string methods
+//     #[test]
+//     fn test_string() {
+//         let program = vec![
+//             Statement::Let {
+//                 token: Token::Let,
+//                 name: Identifier {
+//                     token: Token::Ident("my_var".to_owned()),
+//                     value: "my_var".to_owned(),
+//                 },
+//                 value: Some(Expression::Identifier {
+//                     token: Token::Ident("another_var".to_owned()),
+//                     value: "another_var".to_owned(),
+//                 }),
+//         }];
+// 
+//         assert_eq!(format!("{:?}", program), "let my_var = another_var;", "to_string() method should work properly")
+//     }
 }
 

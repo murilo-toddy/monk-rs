@@ -1,404 +1,82 @@
-use core::fmt::Debug;
-use std::any::Any;
-
 use crate::token::Token;
 
-pub trait Node {
-    fn get_token(&self) -> &Token;
-    fn to_string(&self) -> String; // TODO can this be a Display trait?
-}
-
-#[derive(Debug, PartialEq)]
-pub enum StatementType {
-    LetStatement,
-    ReturnStatement,
-    ExpressionStatement,
-}
-
-pub trait Statement: Node {
-    fn as_any(&self) -> &dyn Any;
-    fn get_type(&self) -> StatementType;
-    fn statement_node(&self);
-}
-
-impl Debug for dyn Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.get_type())
-    }
-}
-
-pub trait Expression: Node {
-    fn as_any(&self) -> &dyn Any;
-    fn expression_node(&self);
-}
-
-pub struct Program {
-    pub statements: Vec<Box<dyn Statement>>,
-}
-
-impl Node for Program {
-    fn get_token(&self) -> &Token {
-        match self.statements.len() {
-            0 => &Token::Eof,
-            _ => self.statements[0].get_token()
-        }
-    }
-
-    fn to_string(&self) -> String {
-        let mut string = String::new();
-        for s in &self.statements {
-            string.push_str(&s.to_string()[..]);
-        }
-        string
-    }
-}
-
-pub struct LetStatement {
-    pub token: Token, // Token::Let
-    pub name: Identifier,
-    pub value: Option<Box<dyn Expression>>,
-}
-
-impl Statement for LetStatement {
-    fn as_any(&self) -> &dyn Any {
-        self   
-    }
-
-    fn get_type(&self) -> StatementType {
-        StatementType::LetStatement
-    }
-
-    fn statement_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for LetStatement {
-    fn get_token(&self) -> &Token {
-        &self.token
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        s.push_str(&format!("{:?} ", self.token).to_lowercase());
-        s.push_str(self.name.to_string().as_str());
-        s.push_str(" = ");
-        if let Some(value) = &self.value {
-            s.push_str(value.to_string().as_str());
-        }
-        s.push(';');
-        s
-    }
-}
-
-pub struct ReturnStatement {
-    pub token: Token, // Token::Return
-    pub value: Option<Box<dyn Expression>>,
-}
-
-impl Statement for ReturnStatement {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn get_type(&self) -> StatementType {
-        StatementType::ReturnStatement
-    }
-
-    fn statement_node(&self) {
-        todo!("not implemented")
-    }
-}
-
-impl Node for ReturnStatement {
-    fn get_token(&self) -> &Token {
-        &self.token
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        s.push_str(&format!("{:?} ", self.token).to_lowercase());
-        if let Some(value) = &self.value {
-            s.push_str(value.to_string().as_str());
-        }
-        s.push(';');
-        s
-    }
-}
-
-pub struct ExpressionStatement {
-    pub token: Token, // first token of the expression
-    pub expression: Option<Box<dyn Expression>>,
-}
-
-impl Statement for ExpressionStatement {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn get_type(&self) -> StatementType {
-        StatementType::ExpressionStatement
-    }
-
-    fn statement_node(&self) {
-        todo!("not implemented")
-    }
-}
-
-impl Node for ExpressionStatement {
-    fn get_token(&self) -> &Token {
-        &self.token
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        if let Some(exp) = &self.expression {
-            s.push_str(&exp.to_string());
-        }
-        s
-    }
-}
-
-#[derive(Debug)]
-pub struct BlockStatement {
-    pub token: Token, // Token::Lbrace
-    pub statements: Vec<Box<dyn Statement>>,
-}
-
-impl Expression for BlockStatement {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for BlockStatement {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        for statement in &self.statements {
-            s.push_str(statement.to_string().as_str());
-        }
-        s
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Identifier {
-    pub token: Token, // Token::Ident
+#[derive(Eq, PartialEq, Debug)]
+pub struct Identifier{ 
+    pub token: Token,
     pub value: String,
 }
 
-impl Expression for Identifier {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
+#[derive(Eq, PartialEq, Debug)]
+pub enum Statement {
+    Let {
+        token: Token,
+        name: Identifier,
+        value: Option<Expression>,
+    },
+    Return {
+        token: Token,
+        value: Option<Expression>,
+    },
+    Expression {
+        token: Token,
+        expression: Option<Expression>,
+    },
 }
 
-impl Node for Identifier {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        self.value.clone()
-    }
+#[derive(Eq, PartialEq, Debug)]
+pub enum Expression {
+    Identifier {
+        token: Token,
+        value: String,
+    },
+    Integer {
+        token: Token,
+        value: i64,
+    },
+    Boolean {
+        token: Token,
+        value: bool,
+    },
+    Prefix {
+        token: Token,
+        operator: String,
+        right: Box<Expression>,
+    },
+    Infix {
+        token: Token,
+        operator: String,
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    If {
+        token: Token,
+        condition: Box<Expression>,
+        consequence: BlockStatement,
+        alternative: Option<BlockStatement>,
+    },
+    Function {
+        token: Token,
+        arguments: Vec<Identifier>,
+        body: BlockStatement,
+    },
 }
 
-pub struct IntegerLiteral {
-    pub token: Token, // Token::Integer
-    pub value: i64,
+#[derive(Debug, Eq, PartialEq)]
+pub struct BlockStatement {
+    pub token: Token,
+    pub statements: Vec<Statement>,
 }
 
-impl Expression for IntegerLiteral {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
+pub type Program = Vec<Statement>;
 
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
+#[derive(Eq, PartialEq, PartialOrd)]
+pub enum Precedence {
+    Lowest = 1,
+    Equals = 2,      // ==
+    LessGreater = 3, // > or <
+    Sum = 4,         // +
+    Product = 5,     // *
+    Prefix = 6,      // -x or !x
+    Call = 7,        // func(x)
 }
 
-impl Node for IntegerLiteral {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        format!("{}", self.value.clone())
-    }
-}
-
-pub struct Boolean {
-    pub token: Token, // Token::Boolean
-    pub value: bool,
-}
-
-impl Expression for Boolean {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for Boolean {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        format!("{}", self.value.clone())
-    }
-}
-
-pub struct PrefixExpression {
-    pub token: Token, // prefix token
-    pub operator: String,
-    pub right: Box<dyn Expression>,
-}
-
-impl Expression for PrefixExpression {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for PrefixExpression {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        s.push('(');
-        s.push_str(self.operator.as_str());
-        s.push_str(self.right.to_string().as_str());
-        s.push(')');
-        s
-    }
-}
-
-pub struct InfixExpression {
-    pub token: Token, // infix operator token
-    pub operator: String,
-    pub left: Box<dyn Expression>,
-    pub right: Box<dyn Expression>,
-}
-
-impl Expression for InfixExpression {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for InfixExpression {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        s.push('(');
-        s.push_str(self.left.to_string().as_str());
-        s.push_str(format!(" {} ", self.operator).as_str());
-        s.push_str(self.right.to_string().as_str());
-        s.push(')');
-        s
-    }
-}
-
-pub struct IfExpression {
-    pub token: Token, // Token::If
-    pub condition: Box<dyn Expression>,
-    pub consequence: BlockStatement,
-    pub alternative: Option<BlockStatement>,
-}
-
-impl Expression for IfExpression {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for IfExpression {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        s.push_str("if");
-        s.push_str(self.condition.to_string().as_str());
-        s.push(' ');
-        s.push_str(self.consequence.to_string().as_str());
-        if let Some(alternative) = &self.alternative {
-            s.push_str("else ");
-            s.push_str(alternative.to_string().as_str());
-        }
-        s
-    }
-}
-
-#[derive(Debug)]
-pub struct FunctionLiteral {
-    pub token: Token, // Token::Function
-    pub arguments: Vec<Identifier>,
-    pub body: BlockStatement,
-}
-
-impl Expression for FunctionLiteral {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn expression_node(&self) {
-        todo!("not implemented");
-    }
-}
-
-impl Node for FunctionLiteral {
-    fn get_token(&self) -> &Token {
-        todo!("not implemented");
-    }
-
-    fn to_string(&self) -> String {
-        let mut s = String::new();
-        s.push_str("fn(");
-        s.push_str(self.arguments
-            .iter()
-            .map(|arg| arg.to_string())
-            .collect::<Vec<String>>()
-            .join(", ")
-            .as_str());
-
-        s.push_str(") ");
-        s.push_str(self.body.to_string().as_str());
-        s
-    }
-}
