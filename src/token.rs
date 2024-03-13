@@ -1,11 +1,12 @@
 // TODO add support for floats
+// TODO add for loops
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
     Illegal(char),
     Eof,
 
     // Identifiers
-    Ident(String),
+    Identifier(String),
     Integer(i64),
 
     // Operators
@@ -50,7 +51,7 @@ impl Token {
             "return" => Token::Return,
             "true" => Token::True,
             "false" => Token::False,
-            _ => Token::Ident(literal),
+            _ => Token::Identifier(literal),
         }
     }
 
