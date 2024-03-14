@@ -306,31 +306,25 @@ impl<'a> Parser<'a> {
         if !self.expect_peek(&Token::Assign) {
             return None;
         }
-        
-        // TODO skipping expressions until a semicolon is found
-        while !self.current_token_is(Token::Semicolon) {
+        self.next();
+
+        let value = self.parse_expression(Precedence::Lowest);
+        if self.peek_token_is(&Token::Semicolon) {
             self.next();
         }
 
-        Some(Statement::Let {
-            name: identifier,
-            token,
-            value: None,
-        })
+        Some(Statement::Let { name: identifier, token, value })
     }
 
     fn parse_return_statement(&mut self) -> Option<Statement> {
         let token = self.current_token.clone();
         self.next();
 
-        // TODO skipping expressions until a semicolon is found
-        while !self.current_token_is(Token::Semicolon) {
+        let value = self.parse_expression(Precedence::Lowest);
+        if self.peek_token_is(&Token::Semicolon) {
             self.next();
         }
-        Some(Statement::Return {
-            token,
-            value: None,
-        })
+        Some(Statement::Return { token, value })
     }
 
     fn precedence_from_token(&self, token: &Token) -> Precedence {
@@ -470,8 +464,8 @@ mod parser_tests {
     #[test]
     fn test_let_statements() {
         let input = "let x = 5;
-            let y = 10;
-            let foobar = 838383;".as_bytes();
+            let y = true;
+            let foobar = y;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
@@ -483,17 +477,17 @@ mod parser_tests {
                 Statement::Let {
                     token: Token::Let,
                     name: Identifier { token: Token::Identifier("x".to_owned()), value: "x".to_owned() },
-                    value: None,
+                    value: Some(integer(5)),
                 },
                 Statement::Let {
                     token: Token::Let,
                     name: Identifier { token: Token::Identifier("y".to_owned()), value: "y".to_owned() },
-                    value: None,
+                    value: Some(boolean(true)),
                 },
                 Statement::Let {
                     token: Token::Let,
                     name: Identifier { token: Token::Identifier("foobar".to_owned()), value: "foobar".to_owned() },
-                    value: None,
+                    value: Some(identifier("y")),
                 },
             ]),
             program
@@ -503,8 +497,8 @@ mod parser_tests {
     #[test]
     fn test_return_statements() {
         let input = "return 5;
-            return 10;
-            return 838383;".as_bytes();
+            return false;
+            return xy;".as_bytes();
         
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
@@ -515,15 +509,15 @@ mod parser_tests {
             Program(vec![
                 Statement::Return {
                     token: Token::Return,
-                    value: None,
+                    value: Some(integer(5)),
                 },
                 Statement::Return{
                     token: Token::Return,
-                    value: None,
+                    value: Some(boolean(false)),
                 },
                 Statement::Return {
                     token: Token::Return,
-                    value: None,
+                    value: Some(identifier("xy")),
                 },
             ]),
             program
