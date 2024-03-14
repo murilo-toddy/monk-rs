@@ -39,14 +39,12 @@ impl<'a> Parser<'a> {
 
     fn parse_function_literal(&mut self) -> Expression {
         let function_token = self.current_token.clone();
-        println!("{:?} {:?}", self.current_token, self.peek_token);
         if !self.expect_peek(&Token::Lparen) {
             // TODO add parse error
             panic!("function literal should contain a left parenthesis");
         }
         
         let arguments = self.parse_function_arguments();
-        println!("{:?} {:?}", self.current_token, self.peek_token);
         if !self.expect_peek(&Token::Lbrace) {
             // TODO add parse error
             panic!("function literal should contain a block statement after arguments");
@@ -198,7 +196,7 @@ impl<'a> Parser<'a> {
         
         Expression::Prefix {
             token: current_token.clone(),
-            operator: current_token.to_string(),
+            operator: format!("{}", current_token),
             right: Box::from(self.parse_expression(Precedence::Prefix).unwrap_or_else(||
                 panic!("prefix expressions should have right")
             )),
@@ -212,7 +210,7 @@ impl<'a> Parser<'a> {
 
         Expression::Infix {
             token: current_token.clone(),
-            operator: current_token.to_string(),
+            operator: format!("{}", current_token),
             left: Box::from(left),
             right: Box::from(self.parse_expression(precedence).unwrap()),
         }
@@ -230,7 +228,6 @@ impl<'a> Parser<'a> {
         // TODO add error possibility
         arguments.push(self.parse_expression(Precedence::Lowest).unwrap());
 
-        println!("{:?}", arguments);
         while self.peek_token_is(&Token::Comma) {
             self.next();
             self.next();
@@ -251,7 +248,6 @@ impl<'a> Parser<'a> {
             function: Box::new(left),
             arguments: self.parse_call_arguments(),
         };
-        println!("{:?}", s);
         s
     }
 
@@ -373,11 +369,7 @@ impl<'a> Parser<'a> {
             },
         };
 
-        println!("{:?}", self.current_token);
-        println!("{:?} {:?}", precedence, self.peek_precedence());
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
-            println!("{:?}", self.current_token);
-            println!("{:?}", self.peek_token);
             
             // infix expressions
             left_expression = match self.peek_token {
@@ -433,7 +425,7 @@ impl<'a> Parser<'a> {
             }
             self.next();
         }
-        statements
+        Program(statements)
     }
 }
 
@@ -487,7 +479,7 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![
+            Program(vec![
                 Statement::Let {
                     token: Token::Let,
                     name: Identifier { token: Token::Identifier("x".to_owned()), value: "x".to_owned() },
@@ -503,7 +495,7 @@ mod parser_tests {
                     name: Identifier { token: Token::Identifier("foobar".to_owned()), value: "foobar".to_owned() },
                     value: None,
                 },
-            ],
+            ]),
             program
         );
     }
@@ -520,7 +512,7 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![
+            Program(vec![
                 Statement::Return {
                     token: Token::Return,
                     value: None,
@@ -533,7 +525,7 @@ mod parser_tests {
                     token: Token::Return,
                     value: None,
                 },
-            ],
+            ]),
             program
         );
     }
@@ -549,12 +541,12 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![
+            Program(vec![
                 Statement::Expression {
                     token: Token::Identifier(expected_value.to_owned()),
                     expression: Some(identifier(expected_value)),
                 },
-            ],
+            ]),
             program
         );
     }
@@ -569,12 +561,12 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![
+            Program(vec![
                 Statement::Expression {
                     token: Token::Integer(5),
                     expression: Some(integer(5)),
                 },
-            ],
+            ]),
             program
         );
     }
@@ -589,7 +581,7 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![
+            Program(vec![
                 Statement::Expression {
                     token: Token::True,
                     expression: Some(boolean(true)),
@@ -598,7 +590,7 @@ mod parser_tests {
                     token: Token::False,
                     expression: Some(boolean(false)),
                 },
-            ],
+            ]),
             program
         );
     }
@@ -608,7 +600,7 @@ mod parser_tests {
         let tests = vec![
             (
                 "!5;",
-                vec![
+                Program(vec![
                     Statement::Expression {
                         token: Token::Bang,
                         expression: Some(Expression::Prefix {
@@ -617,11 +609,11 @@ mod parser_tests {
                             right: Box::from(integer(5)),
                         })
                     },
-                ],
+                ]),
             ),
             (
                 "-15;",
-                vec![
+                Program(vec![
                     Statement::Expression {
                         token: Token::Minus,
                         expression: Some(Expression::Prefix {
@@ -630,7 +622,7 @@ mod parser_tests {
                             right: Box::from(integer(15)),
                         })
                     },
-                ],
+                ]),
             )
         ];
 
@@ -659,16 +651,15 @@ mod parser_tests {
     #[test]
     fn test_infix_expression() {
         let tests = vec![
-            ("5 + 5;", infix_template(5, "+", Token::Plus, 5)),
-            ("5 - 5;", infix_template(5, "-", Token::Minus, 5)),
-            ("5 * 5;", infix_template(5, "*", Token::Asterisk, 5)),
-            ("5 / 5;", infix_template(5, "/", Token::Slash, 5)),
-            ("5 > 5;", infix_template(5, ">", Token::Gt, 5)),
-            ("5 < 5;", infix_template(5, "<", Token::Lt, 5)),
-            ("5 == 5;", infix_template(5, "==", Token::Eq, 5)),
-            ("5 != 5;", infix_template(5, "!=", Token::Neq, 5)),
-        ];
-
+            ("5 + 5;", Program(infix_template(5, "+", Token::Plus, 5))),
+            ("5 - 5;", Program(infix_template(5, "-", Token::Minus, 5))),
+            ("5 * 5;", Program(infix_template(5, "*", Token::Asterisk, 5))),
+            ("5 / 5;", Program(infix_template(5, "/", Token::Slash, 5))),
+            ("5 > 5;", Program(infix_template(5, ">", Token::Gt, 5))),
+            ("5 < 5;", Program(infix_template(5, "<", Token::Lt, 5))),
+            ("5 == 5;", Program(infix_template(5, "==", Token::Eq, 5))),
+            ("5 != 5;", Program(infix_template(5, "!=", Token::Neq, 5))),
+        ]; 
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
             let mut parser = Parser::new(lexer);
@@ -688,7 +679,7 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![Statement::Expression {
+            Program(vec![Statement::Expression {
                 token: Token::If,
                 expression: Some(Expression::If {
                     token: Token::If,
@@ -709,7 +700,7 @@ mod parser_tests {
                     },
                     alternative: None,
                 })
-           }],
+           }]),
             program
         );
     }
@@ -723,7 +714,7 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![Statement::Expression {
+            Program(vec![Statement::Expression {
                 token: Token::If,
                 expression: Some(Expression::If {
                     token: Token::If,
@@ -752,7 +743,7 @@ mod parser_tests {
                         ],
                     }),
                 })
-           }],
+           }]),
             program
         );
     }
@@ -766,7 +757,7 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![
+            Program(vec![
                 Statement::Expression {
                     token: Token::Function,
                     expression: Some(Expression::Function {
@@ -791,7 +782,7 @@ mod parser_tests {
                         }
                     }),
                 }
-            ],
+            ]),
             program
         );
     }
@@ -805,7 +796,7 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            vec![
+            Program(vec![
                 Statement::Expression {
                     token: Token::Identifier("add".to_owned()),
                     expression: Some(Expression::Call {
@@ -828,346 +819,62 @@ mod parser_tests {
                         ],
                     }),
                 }
-            ],
+            ]),
             program
         );
     }
 
-// TODO move tests to new structure
-//    #[test]
-//    fn test_operator_precedence() {
-//        let tests = vec![
-//            (
-//                "-a * b",
-//                Statement::Expression { 
-//                    token: Token::Minus,
-//                    expression: Some(Expression::Infix {
-//                        token: Infix::Multiply,
-//                        operator: "*".to_owned(),
-//                        left: Box::new(Expression::Prefix(
-//                            token: Prefix::Minus,
-//                            Box::new(Expression::Ident(Ident(String::from("a")))),
-//                        )),
-//                        right: Box::new(Expression::Ident(Ident(String::from("b")))),
-//                    }),
-//                },
-//            ),
-//            (
-//                "!-a",
-//                Statement::Expression {
-//                    expression: Expression::Prefix {
-//                        Prefix::Not,
-//                        Box::new(Expression::Prefix(
-//                            Prefix::Minus,
-//                            Box::new(Expression::Ident(Ident(String::from("a")))),
-//                        )),
-//                    }
-//                },
-//            ),
-//            (
-//                "a + b + c",
-//                Statement::Expression {
-//                    expression: Expression::Infix {
-//                        Infix::Plus,
-//                        Box::new(Expression::Infix(
-//                            Infix::Plus,
-//                            Box::new(Expression::Ident(Ident(String::from("a")))),
-//                            Box::new(Expression::Ident(Ident(String::from("b")))),
-//                        )),
-//                        Box::new(Expression::Ident(Ident(String::from("c")))),
-//                    }
-//                },
-//            ),
-//            (
-//                "a + b - c",
-//                Statement::Expression {
-//                    expression: Expression::Infix {
-//                        Infix::Minus,
-//                        Box::new(Expression::Infix(
-//                            Infix::Plus,
-//                            Box::new(Expression::Ident(Ident(String::from("a")))),
-//                            Box::new(Expression::Ident(Ident(String::from("b")))),
-//                        )),
-//                        Box::new(Expression::Ident(Ident(String::from("c")))),
-//                    }
-//                },
-//            ),
-//            (
-//                "a * b * c",
-//                Statement::Expression {
-//                    expression: Expression::Infix {
-//                        Infix::Multiply,
-//                        Box::new(Expression::Infix(
-//                            Infix::Multiply,
-//                            Box::new(Expression::Ident(Ident(String::from("a")))),
-//                            Box::new(Expression::Ident(Ident(String::from("b")))),
-//                        )),
-//                        Box::new(Expression::Ident(Ident(String::from("c")))),
-//                    },
-//                },
-//            ),
-//            (
-//                "a * b / c",
-//                Statement::Expression {
-//                    expression: Expression::Infix {
-//                        Infix::Divide,
-//                        Box::new(Expression::Infix(
-//                            Infix::Multiply,
-//                            Box::new(Expression::Ident(Ident(String::from("a")))),
-//                            Box::new(Expression::Ident(Ident(String::from("b")))),
-//                        )),
-//                        Box::new(Expression::Ident(Ident(String::from("c")))),
-//                    },
-//                },
-//            ),
-//            (
-//                "a + b / c",
-//                Statement::Expression {
-//                    expression: Expression::Infix {
-//                        Infix::Plus,
-//                        Box::new(Expression::Ident(Ident(String::from("a")))),
-//                        Box::new(Expression::Infix(
-//                            Infix::Divide,
-//                            Box::new(Expression::Ident(Ident(String::from("b")))),
-//                            Box::new(Expression::Ident(Ident(String::from("c")))),
-//                        )),
-//                    }
-//                },
-//            ),
-//            (
-//                "a + b * c + d / e - f",
-//                Statement::Expression {
-//                    expression: Expression::Infix {
-//                        Infix::Minus,
-//                        Box::new(Expression::Infix(
-//                            Infix::Plus,
-//                            Box::new(Expression::Infix(
-//                                Infix::Plus,
-//                                Box::new(Expression::Ident(Ident(String::from("a")))),
-//                                Box::new(Expression::Infix(
-//                                    Infix::Multiply,
-//                                    Box::new(Expression::Ident(Ident(String::from("b")))),
-//                                    Box::new(Expression::Ident(Ident(String::from("c")))),
-//                                )),
-//                            )),
-//                            Box::new(Expression::Infix(
-//                                Infix::Divide,
-//                                Box::new(Expression::Ident(Ident(String::from("d")))),
-//                                Box::new(Expression::Ident(Ident(String::from("e")))),
-//                            )),
-//                        )),
-//                        Box::new(Expression::Ident(Ident(String::from("f")))),
-//                    },
-//                },
-//            ),
-//            (
-//                "5 > 4 == 3 < 4",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Equal,
-//                    Box::new(Expression::Infix(
-//                        Infix::GreaterThan,
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                    Box::new(Expression::Infix(
-//                        Infix::LessThan,
-//                        Box::new(Expression::Literal(Literal::Int(3))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                )},
-//            ),
-//            (
-//                "5 < 4 != 3 > 4",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::NotEqual,
-//                    Box::new(Expression::Infix(
-//                        Infix::LessThan,
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                    Box::new(Expression::Infix(
-//                        Infix::GreaterThan,
-//                        Box::new(Expression::Literal(Literal::Int(3))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                )},
-//            ),
-//            (
-//                "5 >= 4 == 3 <= 4",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Equal,
-//                    Box::new(Expression::Infix(
-//                        Infix::GreaterThanEqual,
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                    Box::new(Expression::Infix(
-//                        Infix::LessThanEqual,
-//                        Box::new(Expression::Literal(Literal::Int(3))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                )},
-//            ),
-//            (
-//                "5 <= 4 != 3 >= 4",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::NotEqual,
-//                    Box::new(Expression::Infix(
-//                        Infix::LessThanEqual,
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                    Box::new(Expression::Infix(
-//                        Infix::GreaterThanEqual,
-//                        Box::new(Expression::Literal(Literal::Int(3))),
-//                        Box::new(Expression::Literal(Literal::Int(4))),
-//                    )),
-//                )},
-//            ),
-//            (
-//                "3 + 4 * 5 == 3 * 1 + 4 * 5",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Equal,
-//                    Box::new(Expression::Infix(
-//                        Infix::Plus,
-//                        Box::new(Expression::Literal(Literal::Int(3))),
-//                        Box::new(Expression::Infix(
-//                            Infix::Multiply,
-//                            Box::new(Expression::Literal(Literal::Int(4))),
-//                            Box::new(Expression::Literal(Literal::Int(5))),
-//                        )),
-//                    )),
-//                    Box::new(Expression::Infix(
-//                        Infix::Plus,
-//                        Box::new(Expression::Infix(
-//                            Infix::Multiply,
-//                            Box::new(Expression::Literal(Literal::Int(3))),
-//                            Box::new(Expression::Literal(Literal::Int(1))),
-//                        )),
-//                        Box::new(Expression::Infix(
-//                            Infix::Multiply,
-//                            Box::new(Expression::Literal(Literal::Int(4))),
-//                            Box::new(Expression::Literal(Literal::Int(5))),
-//                        )),
-//                    )),
-//                )},
-//            ),
-//            ("true", Statement::Expression {Expression::Literal(Literal::Bool(true))}),
-//            ("false", Statement::Expression {Expression::Literal(Literal::Bool(false))}),
-//            (
-//                "3 > 5 == false",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Equal,
-//                    Box::new(Expression::Infix(
-//                        Infix::GreaterThan,
-//                        Box::new(Expression::Literal(Literal::Int(3))),
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                    )),
-//                    Box::new(Expression::Literal(Literal::Bool(false))),
-//                )},
-//            ),
-//            (
-//                "3 < 5 == true",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Equal,
-//                    Box::new(Expression::Infix(
-//                        Infix::LessThan,
-//                        Box::new(Expression::Literal(Literal::Int(3))),
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                    )),
-//                    Box::new(Expression::Literal(Literal::Bool(true))),
-//                )},
-//            ),
-//            (
-//                "1 + (2 + 3) + 4",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Plus,
-//                    Box::new(Expression::Infix(
-//                        Infix::Plus,
-//                        Box::new(Expression::Literal(Literal::Int(1))),
-//                        Box::new(Expression::Infix(
-//                            Infix::Plus,
-//                            Box::new(Expression::Literal(Literal::Int(2))),
-//                            Box::new(Expression::Literal(Literal::Int(3))),
-//                        )),
-//                    )),
-//                    Box::new(Expression::Literal(Literal::Int(4))),
-//                )},
-//            ),
-//            (
-//                "(5 + 5) * 2",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Multiply,
-//                    Box::new(Expression::Infix(
-//                        Infix::Plus,
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                    )),
-//                    Box::new(Expression::Literal(Literal::Int(2))),
-//                )},
-//            ),
-//            (
-//                "2 / (5 + 5)",
-//                Statement::Expression {Expression::Infix(
-//                    Infix::Divide,
-//                    Box::new(Expression::Literal(Literal::Int(2))),
-//                    Box::new(Expression::Infix(
-//                        Infix::Plus,
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                    )),
-//                )},
-//            ),
-//            (
-//                "-(5 + 5)",
-//                Statement::Expression {Expression::Prefix(
-//                    Prefix::Minus,
-//                    Box::new(Expression::Infix(
-//                        Infix::Plus,
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                        Box::new(Expression::Literal(Literal::Int(5))),
-//                    )),
-//                )},
-//            ),
-//            (
-//                "!(true == true)",
-//                Statement::Expression {Expression::Prefix(
-//                    Prefix::Not,
-//                    Box::new(Expression::Infix(
-//                        Infix::Equal,
-//                        Box::new(Expression::Literal(Literal::Bool(true))),
-//                        Box::new(Expression::Literal(Literal::Bool(true))),
-//                    )),
-//                )},
-//            ),
-//        ];
-//        for (input, expected) in tests {
-//            let lexer = Lexer::new(input.as_bytes());
-//            let mut parser = Parser::new(lexer);
-//            let program = parser.parse();
-//            check_parse_errors(parser);
-//
-//            assert_eq!(program, expected);
-//        }
-//    }
+    #[test]
+    fn test_operator_precedence() {
+        let tests = vec![
+    		("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("(5 + 5) * 2 * (5 + 5)", "(((5 + 5) * 2) * (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            ("add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))", "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))"),
+            ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"),
+        ];
+        for (input, expected) in tests {
+            let lexer = Lexer::new(input.as_bytes());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            check_parse_errors(parser);
 
-//     TODO implement to string methods
-//     #[test]
-//     fn test_string() {
-//         let program = vec![
-//             Statement::Let {
-//                 token: Token::Let,
-//                 name: Identifier {
-//                     token: Token::Ident("my_var".to_owned()),
-//                     value: "my_var".to_owned(),
-//                 },
-//                 value: Some(Expression::Identifier {
-//                     token: Token::Ident("another_var".to_owned()),
-//                     value: "another_var".to_owned(),
-//                 }),
-//         }];
-// 
-//         assert_eq!(format!("{:?}", program), "let my_var = another_var;", "to_string() method should work properly")
-//     }
+            assert_eq!(format!("{}", program), expected);
+        }
+    }
+
+    #[test]
+    fn test_string() {
+        let program = Program(vec![
+            Statement::Let {
+                token: Token::Let,
+                name: Identifier {
+                    token: Token::Identifier("my_var".to_owned()),
+                    value: "my_var".to_owned(),
+                },
+                value: Some(identifier("another_var")),
+        }]);
+        assert_eq!(format!("{}", program), "let my_var = another_var;")
+    }
 }
 
