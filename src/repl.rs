@@ -1,6 +1,13 @@
 use std::io::{self, BufRead, Write};
-use crate::lexer;
-use crate::token::Token;
+use crate::{lexer, parser};
+
+fn print_parse_errors<W>(output: &mut W, errors: &Vec<parser::ParseError>) -> io::Result<()>
+where W: Write {
+    for error in errors {
+        output.write_all(format!("{}", error).as_bytes())?;
+    }
+    Ok(())
+}
 
 pub fn start<R, W>(input: &mut R, output: &mut W) -> io::Result<()>
 where
@@ -12,14 +19,16 @@ where
     output.flush().unwrap();
     for line in input.lines() {
         if let Ok(line) = line {
-            let mut lexer = lexer::Lexer::new(line.as_bytes());
-            let mut token = lexer.next();
-            while token != Token::Eof {
-                // TODO handle errors
-                output.write_all(format!("{:?}\n", token).as_bytes()).unwrap();
-                output.flush().unwrap();
-                token = lexer.next();
+            let lexer = lexer::Lexer::new(line.as_bytes());
+            let mut parser = parser::Parser::new(lexer);
+
+            let program = parser.parse();
+            if parser.get_errors().len() > 0 {
+                print_parse_errors(output, parser.get_errors())?;
             }
+
+            output.write_all(format!("{}\n", program).as_bytes())?;
+
         } else {
             eprintln!("ERROR: could not read input line");
         }

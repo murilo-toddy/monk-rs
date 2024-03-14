@@ -5,7 +5,7 @@ use crate::token::Token;
 use crate::ast::*;
 
 #[derive(Debug, Clone)]
-struct ParseError {
+pub struct ParseError {
     message: String,
 }
 
@@ -15,7 +15,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
     peek_token: Token,
@@ -24,7 +24,7 @@ struct Parser<'a> {
 
 // TODO reorder internal functions
 impl<'a> Parser<'a> {
-    fn new(lexer: Lexer) -> Parser {
+    pub fn new(lexer: Lexer) -> Parser {
         let mut parser = Parser {
             lexer,
             current_token: Token::Eof,
@@ -251,7 +251,7 @@ impl<'a> Parser<'a> {
         s
     }
 
-    fn get_errors(&self) -> &Vec<ParseError> {
+    pub fn get_errors(&self) -> &Vec<ParseError> {
         &self.errors
     }
 
@@ -260,10 +260,6 @@ impl<'a> Parser<'a> {
         self.peek_token = self.lexer.next();
     }
 
-
-    fn token_types_match(&self, t1: &Token, t2: &Token) -> bool {
-        std::mem::discriminant(t1) == std::mem::discriminant(t2)
-    }
 
     fn peek_error(&mut self, expected_token: &Token) {
         self.errors.push(ParseError { 
