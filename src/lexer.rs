@@ -64,29 +64,20 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next(&mut self) -> Token {
+    fn compare_peek(&mut self, ch: char, eq_token: Token, else_token: Token) -> Token {
+        if (self.peek_char() as char) == ch {
+            self.read_char();
+            return eq_token
+        }
+        else_token
+    }
+
+    pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
         let token = match self.ch as char {
             '\0' => Token::Eof,
-            // TODO abstract peeking logic
-            '=' => {
-                match self.peek_char() as char {
-                    '=' => {
-                        self.read_char();
-                        Token::Eq
-                    }
-                    _ => Token::Assign
-                }
-            },
-            '!' => {
-                match self.peek_char() as char {
-                    '=' => {
-                        self.read_char();
-                        Token::Neq
-                    }
-                    _ => Token::Bang
-                }
-            },
+            '=' => self.compare_peek('=', Token::Eq, Token::Assign),
+            '!' => self.compare_peek('=', Token::Neq, Token::Bang),
             '+' => Token::Plus,
             '-' => Token::Minus,
             '*' => Token::Asterisk,
@@ -225,7 +216,7 @@ return false;
 
         let mut l = Lexer::new(input);
         for (i, tt) in tests.iter().enumerate() {
-            let token = l.next();
+            let token = l.next_token();
             assert_eq!(token, *tt, "tests[{}] - wrong token type. expected={:?}, got={:?}", i, tt, token);
         }
     }

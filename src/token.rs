@@ -1,11 +1,10 @@
-// TODO add support for floats
-// TODO add for loops
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
     Illegal(char),
     Eof,
-
+    
     // Identifiers
+    // TODO add support for floats
     Identifier(String),
     Integer(i64),
 
@@ -29,6 +28,7 @@ pub enum Token {
     Rbrace,
 
     // Keywords
+    // TODO add loops
     Function,
     Let,
     If,

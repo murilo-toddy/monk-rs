@@ -23,7 +23,7 @@ where
             let mut parser = parser::Parser::new(lexer);
 
             let program = parser.parse();
-            if parser.get_errors().len() > 0 {
+            if !parser.get_errors().is_empty() {
                 print_parse_errors(output, parser.get_errors())?;
             }
 
