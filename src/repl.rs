@@ -1,5 +1,5 @@
 use std::io::{self, BufRead, Write};
-use crate::{lexer, parser};
+use crate::{lexer, parser, evaluator::evaluate_program};
 
 fn print_parse_errors<W>(output: &mut W, errors: &Vec<parser::ParseError>) -> io::Result<()>
 where W: Write {
@@ -25,10 +25,14 @@ where
             let program = parser.parse();
             if !parser.get_errors().is_empty() {
                 print_parse_errors(output, parser.get_errors())?;
+                continue;
             }
 
-            output.write_all(format!("{}\n", program).as_bytes())?;
-
+            let evaluated = evaluate_program(program);
+            match evaluated {
+                Some(obj) => output.write_all(obj.inspect().as_bytes())?,
+                None => continue,
+            };
         } else {
             eprintln!("ERROR: could not read input line");
         }

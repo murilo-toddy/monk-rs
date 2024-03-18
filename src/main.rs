@@ -5,6 +5,8 @@ pub mod lexer;
 pub mod repl;
 pub mod ast;
 pub mod parser;
+pub mod object;
+pub mod evaluator;
 
 fn main() -> io::Result<()> {
     let input = io::stdin();
