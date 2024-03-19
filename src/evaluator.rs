@@ -21,6 +21,35 @@ fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
     }
 }
 
+fn evaluate_infix_expression(operator: String, left: Expression, right: Expression) -> Object {
+    let left_eval = evaluate_expression(left);
+    let right_eval = evaluate_expression(right);
+    match (left_eval, right_eval) {
+        (Object::Integer(left_val), Object::Integer(right_val)) => {
+            match operator.as_str() {
+                "+" => Object::Integer(left_val + right_val),
+                "-" => Object::Integer(left_val - right_val),
+                "*" => Object::Integer(left_val * right_val),
+                "/" => Object::Integer(left_val / right_val),
+                "==" => Object::Boolean(left_val == right_val),
+                "!=" => Object::Boolean(left_val != right_val),
+                ">" => Object::Boolean(left_val > right_val),
+                "<" => Object::Boolean(left_val < right_val),
+                _ => Object::Null,
+            }
+        },
+        (Object::Boolean(left_val), Object::Boolean(right_val)) => {
+            match operator.as_str() {
+                "==" => Object::Boolean(left_val == right_val),
+                "!=" => Object::Boolean(left_val != right_val),
+                _ => Object::Null,
+            }
+        }
+        _ => Object::Null,
+    }
+
+}
+
 fn evaluate_expression(expression: Expression) -> Object {
     match expression {
         Expression::Identifier { .. } => todo!("not implemented"),
@@ -31,7 +60,9 @@ fn evaluate_expression(expression: Expression) -> Object {
         Expression::Prefix { operator, right, .. } => {
             evaluate_prefix_expression(operator, *right)
         },
-        Expression::Infix { .. } => todo!("not implemented"),
+        Expression::Infix { operator, left, right, .. } => {
+            evaluate_infix_expression(operator, *left, *right)
+        },
         Expression::If { .. } => todo!("not implemented"),
         Expression::Function { .. } => todo!("not implemented"),
         Expression::Call { .. } => todo!("not implemented"),
@@ -76,6 +107,21 @@ mod evaluator_tests {
             ("10", Object::Integer(10)),
             ("-5", Object::Integer(-5)),
             ("-10", Object::Integer(-10)),
+            ("5 + 5", Object::Integer(10)),
+            ("5 - 5", Object::Integer(0)),
+            ("5 * 5", Object::Integer(25)),
+            ("5 / 5", Object::Integer(1)),
+            ("5 + 5 + 5 + 5 - 10", Object::Integer(10)),
+            ("2 * 2 * 2 * 2 * 2", Object::Integer(32)),
+            ("-50 + 100 + -50", Object::Integer(0)),
+            ("5 * 2 + 10", Object::Integer(20)),
+            ("5 + 2 * 10", Object::Integer(25)),
+            ("20 + 2 * -10", Object::Integer(0)),
+            ("50 / 2 * 2 + 10", Object::Integer(60)),
+            ("2 * (5 + 10)", Object::Integer(30)),
+            ("3 * 3 * 3 + 10", Object::Integer(37)),
+            ("3 * (3 * 3) + 10", Object::Integer(37)),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", Object::Integer(50)),
         ];
 
         for (input, expected) in tests {
@@ -89,6 +135,23 @@ mod evaluator_tests {
         let tests = vec![
             ("true", Object::Boolean(true)),
             ("false", Object::Boolean(false)),
+            ("true == true", Object::Boolean(true)),
+            ("false == false", Object::Boolean(true)),
+            ("true == false", Object::Boolean(false)),
+            ("true != false", Object::Boolean(true)),
+            ("false != true", Object::Boolean(true)),
+            ("(1 < 2) == true", Object::Boolean(true)),
+            ("(1 < 2) == false", Object::Boolean(false)),
+            ("(1 > 2) == true", Object::Boolean(false)),
+            ("(1 > 2) == false", Object::Boolean(true)),
+            ("1 < 2", Object::Boolean(true)),
+            ("1 > 2", Object::Boolean(false)),
+            ("1 < 1", Object::Boolean(false)),
+            ("1 > 1", Object::Boolean(false)),
+            ("1 == 1", Object::Boolean(true)),
+            ("1 != 1", Object::Boolean(false)),
+            ("1 == 2", Object::Boolean(false)),
+            ("1 != 2", Object::Boolean(true)),
         ];
 
         for (input, expected) in tests {
