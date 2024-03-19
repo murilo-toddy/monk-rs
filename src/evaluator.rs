@@ -2,14 +2,16 @@ use crate::{object::Object, ast::{Program, Statement, Expression}};
 
 fn evaluate_expression(expression: Expression) -> Object {
     match expression {
-        Expression::Identifier { value, .. } => todo!("not implemented"),
+        Expression::Identifier { .. } => todo!("not implemented"),
         Expression::Integer { value, .. } => Object::Integer(value),
-        Expression::Boolean { value, .. } => todo!("not implemented"),
-        Expression::Prefix { operator, right, .. } => todo!("not implemented"),
-        Expression::Infix { left, operator, right, .. } => todo!("not implemented"),
-        Expression::If { condition, consequence, alternative, .. } => todo!("not implemented"),
-        Expression::Function { arguments, body, .. } => todo!("not implemented"),
-        Expression::Call { function, arguments, .. } => todo!("not implemented"),
+        // TODO there's the suggestion to share boolean objects but it's probably
+        // not going to satisfy the borrow checker
+        Expression::Boolean { value, .. } => Object::Boolean(value),
+        Expression::Prefix { .. } => todo!("not implemented"),
+        Expression::Infix { .. } => todo!("not implemented"),
+        Expression::If { .. } => todo!("not implemented"),
+        Expression::Function { .. } => todo!("not implemented"),
+        Expression::Call { .. } => todo!("not implemented"),
     }
 }
 
@@ -49,6 +51,19 @@ mod evaluator_tests {
         let tests = vec![
             ("5", Object::Integer(5)),
             ("10", Object::Integer(10)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_boolean_expression_eval() {
+        let tests = vec![
+            ("true", Object::Boolean(true)),
+            ("false", Object::Boolean(false)),
         ];
 
         for (input, expected) in tests {
