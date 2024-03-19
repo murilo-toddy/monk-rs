@@ -1,5 +1,26 @@
 use crate::{object::Object, ast::{Program, Statement, Expression}};
 
+fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
+    let right_eval = evaluate_expression(right);
+    match operator.as_str() {
+        "!" => {
+            match right_eval {
+                Object::Boolean(value) => Object::Boolean(!value),
+                Object::Integer(value) => Object::Boolean(value == 0),
+                Object::Null => Object::Boolean(true),
+                _ => Object::Boolean(false),
+            }
+        }
+        "-" => {
+            match right_eval {
+                Object::Integer(value) => Object::Integer(-value),
+                _ => Object::Null,
+            }
+        }
+        _ => Object::Null,
+    }
+}
+
 fn evaluate_expression(expression: Expression) -> Object {
     match expression {
         Expression::Identifier { .. } => todo!("not implemented"),
@@ -7,7 +28,9 @@ fn evaluate_expression(expression: Expression) -> Object {
         // TODO there's the suggestion to share boolean objects but it's probably
         // not going to satisfy the borrow checker
         Expression::Boolean { value, .. } => Object::Boolean(value),
-        Expression::Prefix { .. } => todo!("not implemented"),
+        Expression::Prefix { operator, right, .. } => {
+            evaluate_prefix_expression(operator, *right)
+        },
         Expression::Infix { .. } => todo!("not implemented"),
         Expression::If { .. } => todo!("not implemented"),
         Expression::Function { .. } => todo!("not implemented"),
@@ -51,6 +74,8 @@ mod evaluator_tests {
         let tests = vec![
             ("5", Object::Integer(5)),
             ("10", Object::Integer(10)),
+            ("-5", Object::Integer(-5)),
+            ("-10", Object::Integer(-10)),
         ];
 
         for (input, expected) in tests {
@@ -64,6 +89,25 @@ mod evaluator_tests {
         let tests = vec![
             ("true", Object::Boolean(true)),
             ("false", Object::Boolean(false)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_bang_prefix_operator_eval() {
+        let tests = vec![
+            ("!true", Object::Boolean(false)),
+            ("!false", Object::Boolean(true)),
+            ("!5", Object::Boolean(false)),
+            ("!0", Object::Boolean(true)),
+            ("!!true", Object::Boolean(true)),
+            ("!!false", Object::Boolean(false)),
+            ("!!5", Object::Boolean(true)),
+            ("!!0", Object::Boolean(false)),
         ];
 
         for (input, expected) in tests {
