@@ -1,4 +1,11 @@
-use crate::{object::Object, ast::{Program, Statement, Expression}};
+use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}};
+
+fn is_truthy(object: Object) -> bool {
+    match object {
+        Object::Boolean(false) | Object::Integer(0) | Object::Null => false,
+        _ => true 
+    }
+}
 
 fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
     let right_eval = evaluate_expression(right);
@@ -8,7 +15,6 @@ fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
                 Object::Boolean(value) => Object::Boolean(!value),
                 Object::Integer(value) => Object::Boolean(value == 0),
                 Object::Null => Object::Boolean(true),
-                _ => Object::Boolean(false),
             }
         }
         "-" => {
@@ -47,7 +53,23 @@ fn evaluate_infix_expression(operator: String, left: Expression, right: Expressi
         }
         _ => Object::Null,
     }
+}
 
+fn evaluate_block_statement(block: BlockStatement) -> Object {
+    evaluate_statements(block.statements).unwrap_or(Object::Null)
+}
+
+fn evaluate_conditional_expression(
+    condition: Expression, 
+    consequence: BlockStatement,
+    alternative: Option<BlockStatement>
+) -> Object {
+    let condition_eval = evaluate_expression(condition);
+    if is_truthy(condition_eval) {
+        evaluate_block_statement(consequence)
+    } else {
+        alternative.map_or(Object::Null, |block| evaluate_block_statement(block))
+    }
 }
 
 fn evaluate_expression(expression: Expression) -> Object {
@@ -63,7 +85,9 @@ fn evaluate_expression(expression: Expression) -> Object {
         Expression::Infix { operator, left, right, .. } => {
             evaluate_infix_expression(operator, *left, *right)
         },
-        Expression::If { .. } => todo!("not implemented"),
+        Expression::If { condition, consequence, alternative, .. } => {
+            evaluate_conditional_expression(*condition, consequence, alternative)
+        },
         Expression::Function { .. } => todo!("not implemented"),
         Expression::Call { .. } => todo!("not implemented"),
     }
@@ -77,12 +101,16 @@ fn evaluate_statement(statement: Statement) -> Option<Object> {
     }
 }
 
-pub fn evaluate_program(program: Program) -> Option<Object> {
+fn evaluate_statements(statements: Vec<Statement>) -> Option<Object> {
     let mut result = None;
-    for statement in program.0 {
+    for statement in statements {
         result = evaluate_statement(statement);
     }
-    return result;
+    result
+}
+
+pub fn evaluate_program(program: Program) -> Option<Object> {
+    evaluate_statements(program.0)
 }
 
 #[cfg(test)]
@@ -171,6 +199,25 @@ mod evaluator_tests {
             ("!!false", Object::Boolean(false)),
             ("!!5", Object::Boolean(true)),
             ("!!0", Object::Boolean(false)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_conditional_expression_eval() {
+        let tests = vec![
+            ("if (1 > 2) { 10 }", Object::Null),
+            ("if (false) { 10 }", Object::Null),
+            ("if (true) { 10 }", Object::Integer(10)),
+            ("if (1) { 10 }", Object::Integer(10)),
+            ("if (0) { 10 }", Object::Null),
+            ("if (1 < 2) { 10 }", Object::Integer(10)),
+            ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
         ];
 
         for (input, expected) in tests {
