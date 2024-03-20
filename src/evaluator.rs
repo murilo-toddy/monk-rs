@@ -15,6 +15,7 @@ fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
                 Object::Boolean(value) => Object::Boolean(!value),
                 Object::Integer(value) => Object::Boolean(value == 0),
                 Object::Null => Object::Boolean(true),
+                _ => Object::Null,
             }
         }
         "-" => {
@@ -56,7 +57,14 @@ fn evaluate_infix_expression(operator: String, left: Expression, right: Expressi
 }
 
 fn evaluate_block_statement(block: BlockStatement) -> Object {
-    evaluate_statements(block.statements).unwrap_or(Object::Null)
+    let mut result = None;
+    for statement in block.statements {
+        result = evaluate_statement(statement);
+        if let Some(Object::ReturnValue(_)) = result {
+            return result.unwrap_or(Object::Null);
+        }
+    }
+    result.unwrap_or(Object::Null)
 }
 
 fn evaluate_conditional_expression(
@@ -96,21 +104,23 @@ fn evaluate_expression(expression: Expression) -> Object {
 fn evaluate_statement(statement: Statement) -> Option<Object> {
     match statement {
         Statement::Let { .. } => todo!("not implemented"),
-        Statement::Return { .. } => todo!("not implemented"),
+        Statement::Return { value, .. } => {
+            let value_eval = value.map(|v| evaluate_expression(v))?;
+            Some(Object::ReturnValue(Box::new(value_eval)))
+        },
         Statement::Expression { expression, .. } => expression.map(|e| evaluate_expression(e)),
     }
 }
 
-fn evaluate_statements(statements: Vec<Statement>) -> Option<Object> {
+pub fn evaluate_program(program: Program) -> Option<Object> {
     let mut result = None;
-    for statement in statements {
+    for statement in program.0 {
         result = evaluate_statement(statement);
+        if let Some(Object::ReturnValue(result)) = result {
+            return Some(*result);
+        }
     }
     result
-}
-
-pub fn evaluate_program(program: Program) -> Option<Object> {
-    evaluate_statements(program.0)
 }
 
 #[cfg(test)]
@@ -225,4 +235,29 @@ mod evaluator_tests {
             assert_eq!(evaluated, expected);
         }
     }
+
+    #[test]
+    fn test_return_statement_eval() {
+        let tests = vec![
+            ("return 10;", Object::Integer(10)),
+            ("return 10; 9;", Object::Integer(10)),
+            ("return 2 * 5; 9;", Object::Integer(10)),
+            ("9; return 2 * 5; 9;", Object::Integer(10)),
+            (
+                "if (10 > 1) {
+                    if (10 > 1) {
+                        return 10;
+                    }
+                    return 1;
+                }", 
+                Object::Integer(10)
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
 }
+
