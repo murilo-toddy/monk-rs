@@ -1,5 +1,13 @@
 use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}};
 
+// TODO handle errors in a more rusty way
+fn is_error(object: &Object) -> bool {
+    match object {
+        Object::Error(_) => true,
+        _ => false,
+    }
+}
+
 fn is_truthy(object: Object) -> bool {
     match object {
         Object::Boolean(false) | Object::Integer(0) | Object::Null => false,
@@ -9,29 +17,40 @@ fn is_truthy(object: Object) -> bool {
 
 fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
     let right_eval = evaluate_expression(right);
+    if is_error(&right_eval) {
+        return right_eval;
+    }
+    // TODO move the common error out
     match operator.as_str() {
         "!" => {
             match right_eval {
                 Object::Boolean(value) => Object::Boolean(!value),
                 Object::Integer(value) => Object::Boolean(value == 0),
                 Object::Null => Object::Boolean(true),
-                _ => Object::Null,
+                _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
             }
         }
         "-" => {
             match right_eval {
                 Object::Integer(value) => Object::Integer(-value),
-                _ => Object::Null,
+                _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
             }
         }
-        _ => Object::Null,
+        _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
     }
 }
 
 fn evaluate_infix_expression(operator: String, left: Expression, right: Expression) -> Object {
     let left_eval = evaluate_expression(left);
+    if is_error(&left_eval) {
+        return left_eval;
+    }
     let right_eval = evaluate_expression(right);
-    match (left_eval, right_eval) {
+    if is_error(&right_eval) {
+        return right_eval;
+    }
+
+    match (&left_eval, &right_eval) {
         (Object::Integer(left_val), Object::Integer(right_val)) => {
             match operator.as_str() {
                 "+" => Object::Integer(left_val + right_val),
@@ -42,17 +61,23 @@ fn evaluate_infix_expression(operator: String, left: Expression, right: Expressi
                 "!=" => Object::Boolean(left_val != right_val),
                 ">" => Object::Boolean(left_val > right_val),
                 "<" => Object::Boolean(left_val < right_val),
-                _ => Object::Null,
+                _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
             }
         },
         (Object::Boolean(left_val), Object::Boolean(right_val)) => {
             match operator.as_str() {
                 "==" => Object::Boolean(left_val == right_val),
                 "!=" => Object::Boolean(left_val != right_val),
-                _ => Object::Null,
+                _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
             }
         }
-        _ => Object::Null,
+        _ => {
+            if std::mem::discriminant(&left_eval) != std::mem::discriminant(&right_eval) {
+                Object::Error(format!("type mismatch: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
+            } else {
+                Object::Error(format!("unknown operation: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
+            }
+        }
     }
 }
 
@@ -60,8 +85,11 @@ fn evaluate_block_statement(block: BlockStatement) -> Object {
     let mut result = None;
     for statement in block.statements {
         result = evaluate_statement(statement);
-        if let Some(Object::ReturnValue(_)) = result {
-            return result.unwrap_or(Object::Null);
+        match result {
+            Some(Object::ReturnValue(_)) | Some(Object::Error(_)) => {
+                return result.unwrap();
+            }
+            _ => {}
         }
     }
     result.unwrap_or(Object::Null)
@@ -73,6 +101,10 @@ fn evaluate_conditional_expression(
     alternative: Option<BlockStatement>
 ) -> Object {
     let condition_eval = evaluate_expression(condition);
+    if is_error(&condition_eval) {
+        return condition_eval;
+    }
+
     if is_truthy(condition_eval) {
         evaluate_block_statement(consequence)
     } else {
@@ -116,8 +148,10 @@ pub fn evaluate_program(program: Program) -> Option<Object> {
     let mut result = None;
     for statement in program.0 {
         result = evaluate_statement(statement);
-        if let Some(Object::ReturnValue(result)) = result {
-            return Some(*result);
+        match result {
+            Some(Object::ReturnValue(result)) => return Some(*result),
+            Some(Object::Error(_)) => return result,
+            _ => {}
         }
     }
     result
@@ -251,6 +285,53 @@ mod evaluator_tests {
                     return 1;
                 }", 
                 Object::Integer(10)
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+            (
+                "5 + true;",
+                Object::Error("type mismatch: 5 + true".to_owned()),
+            ),
+            (
+                "5 + true; 5;",
+                Object::Error("type mismatch: 5 + true".to_owned()),
+            ),
+            (
+                "-true",
+                Object::Error("unknown operation: -true".to_owned()),
+            ),
+            (
+                "true + false;",
+                Object::Error("unknown operation: true + false".to_owned()),
+            ),
+            (
+                "5; true + false; 5",
+                Object::Error("unknown operation: true + false".to_owned()),
+            ),
+            (
+                "if (10 > 1) { true + false; }",
+                Object::Error("unknown operation: true + false".to_owned()),
+            ),
+            (
+                "
+                    if (10 > 1) {
+                        if (10 > 1) {
+                            return true + false;
+                        }
+                        return 1;
+                    }
+                ",
+                Object::Error("unknown operation: true + false".to_owned()),
             ),
         ];
 

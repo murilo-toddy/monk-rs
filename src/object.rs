@@ -3,7 +3,8 @@ pub enum Object {
     Integer(i64),
     Boolean(bool),
     ReturnValue(Box<Object>),
-    Null
+    Null,
+    Error(String),
 }
 
 impl Object {
@@ -13,6 +14,7 @@ impl Object {
             Object::Boolean(value) => value.to_string(),
             Object::Null => "null".to_owned(),
             Object::ReturnValue(value) => value.inspect(),
+            Object::Error(message) => format!("ERROR: {}", message),
         }
     }
 }
