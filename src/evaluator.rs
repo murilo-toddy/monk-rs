@@ -2,17 +2,11 @@ use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement
 
 // TODO handle errors in a more rusty way
 fn is_error(object: &Object) -> bool {
-    match object {
-        Object::Error(_) => true,
-        _ => false,
-    }
+    matches!(object, Object::Error(_))
 }
 
 fn is_truthy(object: Object) -> bool {
-    match object {
-        Object::Boolean(false) | Object::Integer(0) | Object::Null => false,
-        _ => true 
-    }
+    !matches!(object, Object::Boolean(false) | Object::Integer(0) | Object::Null)
 }
 
 fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
@@ -108,7 +102,7 @@ fn evaluate_conditional_expression(
     if is_truthy(condition_eval) {
         evaluate_block_statement(consequence)
     } else {
-        alternative.map_or(Object::Null, |block| evaluate_block_statement(block))
+        alternative.map_or(Object::Null, evaluate_block_statement)
     }
 }
 
@@ -137,10 +131,10 @@ fn evaluate_statement(statement: Statement) -> Option<Object> {
     match statement {
         Statement::Let { .. } => todo!("not implemented"),
         Statement::Return { value, .. } => {
-            let value_eval = value.map(|v| evaluate_expression(v))?;
+            let value_eval = value.map(evaluate_expression)?;
             Some(Object::ReturnValue(Box::new(value_eval)))
         },
-        Statement::Expression { expression, .. } => expression.map(|e| evaluate_expression(e)),
+        Statement::Expression { expression, .. } => expression.map(evaluate_expression),
     }
 }
 
