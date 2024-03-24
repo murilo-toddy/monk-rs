@@ -1,6 +1,6 @@
 use crate::token::Token;
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Identifier{ 
     pub token: Token,
     pub value: String,
@@ -66,7 +66,7 @@ pub enum Expression {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Statement>,

@@ -1,10 +1,13 @@
-#[derive(Debug, Eq, PartialEq)]
+use crate::{environment::Environment, ast::{BlockStatement, Identifier}};
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
     ReturnValue(Box<Object>),
     Null,
     Error(String),
+    Function(Vec<Identifier>, BlockStatement, Environment),
 }
 
 impl Object {
@@ -15,6 +18,10 @@ impl Object {
             Object::Null => "null".to_owned(),
             Object::ReturnValue(value) => value.inspect(),
             Object::Error(message) => format!("ERROR: {}", message),
+            Object::Function(params, body, _) => {
+                let p = params.iter().map(|p| p.value).collect::<Vec<String>>().join(", ");
+                format!("fn({}) {{\n{}\n}}", p, body)
+            },
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}};
+use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}, environment::Environment};
 
 // TODO handle errors in a more rusty way
 fn is_error(object: &Object) -> bool {
@@ -9,8 +9,8 @@ fn is_truthy(object: Object) -> bool {
     !matches!(object, Object::Boolean(false) | Object::Integer(0) | Object::Null)
 }
 
-fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
-    let right_eval = evaluate_expression(right);
+fn evaluate_prefix_expression(operator: String, right: Expression, env: &mut Environment) -> Object {
+    let right_eval = evaluate_expression(right, env);
     if is_error(&right_eval) {
         return right_eval;
     }
@@ -34,12 +34,17 @@ fn evaluate_prefix_expression(operator: String, right: Expression) -> Object {
     }
 }
 
-fn evaluate_infix_expression(operator: String, left: Expression, right: Expression) -> Object {
-    let left_eval = evaluate_expression(left);
+fn evaluate_infix_expression(
+    operator: String, 
+    left: Expression,
+    right: Expression,
+    env: &mut Environment
+) -> Object {
+    let left_eval = evaluate_expression(left, env);
     if is_error(&left_eval) {
         return left_eval;
     }
-    let right_eval = evaluate_expression(right);
+    let right_eval = evaluate_expression(right, env);
     if is_error(&right_eval) {
         return right_eval;
     }
@@ -75,10 +80,10 @@ fn evaluate_infix_expression(operator: String, left: Expression, right: Expressi
     }
 }
 
-fn evaluate_block_statement(block: BlockStatement) -> Object {
+fn evaluate_block_statement(block: BlockStatement, env: &mut Environment) -> Object {
     let mut result = None;
     for statement in block.statements {
-        result = evaluate_statement(statement);
+        result = evaluate_statement(statement, env);
         match result {
             Some(Object::ReturnValue(_)) | Some(Object::Error(_)) => {
                 return result.unwrap();
@@ -92,56 +97,65 @@ fn evaluate_block_statement(block: BlockStatement) -> Object {
 fn evaluate_conditional_expression(
     condition: Expression, 
     consequence: BlockStatement,
-    alternative: Option<BlockStatement>
+    alternative: Option<BlockStatement>,
+    env: &mut Environment,
 ) -> Object {
-    let condition_eval = evaluate_expression(condition);
+    let condition_eval = evaluate_expression(condition, env);
     if is_error(&condition_eval) {
         return condition_eval;
     }
 
     if is_truthy(condition_eval) {
-        evaluate_block_statement(consequence)
+        evaluate_block_statement(consequence, env)
     } else {
-        alternative.map_or(Object::Null, evaluate_block_statement)
+        alternative.map_or(Object::Null, |a| evaluate_block_statement(a, env))
     }
 }
 
-fn evaluate_expression(expression: Expression) -> Object {
+fn evaluate_expression(expression: Expression, env: &mut Environment) -> Object {
     match expression {
-        Expression::Identifier { .. } => todo!("not implemented"),
+        Expression::Identifier { value, .. } => {
+            env.get(&value).unwrap_or(Object::Error(format!("identifier not found: {}", value)))
+        },
         Expression::Integer { value, .. } => Object::Integer(value),
-        // TODO there's the suggestion to share boolean objects but it's probably
-        // not going to satisfy the borrow checker
         Expression::Boolean { value, .. } => Object::Boolean(value),
         Expression::Prefix { operator, right, .. } => {
-            evaluate_prefix_expression(operator, *right)
+            evaluate_prefix_expression(operator, *right, env)
         },
         Expression::Infix { operator, left, right, .. } => {
-            evaluate_infix_expression(operator, *left, *right)
+            evaluate_infix_expression(operator, *left, *right, env)
         },
         Expression::If { condition, consequence, alternative, .. } => {
-            evaluate_conditional_expression(*condition, consequence, alternative)
+            evaluate_conditional_expression(*condition, consequence, alternative, env)
         },
         Expression::Function { .. } => todo!("not implemented"),
         Expression::Call { .. } => todo!("not implemented"),
     }
 }
 
-fn evaluate_statement(statement: Statement) -> Option<Object> {
+fn evaluate_statement(statement: Statement, env: &mut Environment) -> Option<Object> {
     match statement {
-        Statement::Let { .. } => todo!("not implemented"),
+        Statement::Let { name, value, .. } => {
+            let value_eval = value.map(|v| evaluate_expression(v, env))?;
+            if is_error(&value_eval) {
+                return Some(value_eval);
+            }
+            // TODO remove this clone
+            env.set(name.value, value_eval.clone());
+            Some(value_eval)
+        },
         Statement::Return { value, .. } => {
-            let value_eval = value.map(evaluate_expression)?;
+            let value_eval = value.map(|v| evaluate_expression(v, env))?;
             Some(Object::ReturnValue(Box::new(value_eval)))
         },
-        Statement::Expression { expression, .. } => expression.map(evaluate_expression),
+        Statement::Expression { expression, .. } => expression.map(|v|  evaluate_expression(v, env)),
     }
 }
 
-pub fn evaluate_program(program: Program) -> Option<Object> {
+pub fn evaluate_program(program: Program, env: &mut Environment) -> Option<Object> {
     let mut result = None;
     for statement in program.0 {
-        result = evaluate_statement(statement);
+        result = evaluate_statement(statement, env);
         match result {
             Some(Object::ReturnValue(result)) => return Some(*result),
             Some(Object::Error(_)) => return result,
@@ -158,12 +172,13 @@ mod evaluator_tests {
     use super::*;
 
     fn eval_input(input: &str) -> Object {
+        let mut env = Environment::new();
         let lexer = Lexer::new(input.as_bytes());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
 
         assert_eq!(parser.get_errors().len(), 0);
-        return evaluate_program(program).unwrap();
+        return evaluate_program(program, &mut env).unwrap();
     }
 
     #[test]
@@ -327,6 +342,25 @@ mod evaluator_tests {
                 ",
                 Object::Error("unknown operation: true + false".to_owned()),
             ),
+            (
+                "foobar",
+                Object::Error("identifier not found: foobar".to_owned()),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+    #[test]
+    fn test_let_statements() {
+        let tests = vec![
+            ("let a = 5; a;", Object::Integer(5)),
+            ("let a = 5 * 5; a;", Object::Integer(25)),
+            ("let a = 5; let b = a; b;", Object::Integer(5)),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", Object::Integer(15)),
         ];
 
         for (input, expected) in tests {
