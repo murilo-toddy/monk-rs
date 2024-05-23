@@ -58,6 +58,20 @@ impl<'a> Lexer<'a> {
             .expect("should be valid integer")
     }
 
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+        loop { 
+            self.read_char();
+            if self.ch as char == '"' || self.ch == 0 {
+                break
+            }
+        }
+        match String::from_utf8(self.input[position .. self.position].to_vec()) {
+            Ok(v) => v,
+            Err(e) => panic!("invalid UTF8 string {}", e)
+        }
+    }
+    
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
@@ -90,6 +104,7 @@ impl<'a> Lexer<'a> {
             ',' => Token::Comma,
             '{' => Token::Lbrace,
             '}' => Token::Rbrace,
+            '"' => Token::String(self.read_string()),
             _ => {
                 if Self::is_letter(self.ch) {
                     return Token::from_literal(self.read_identifier());
@@ -135,7 +150,10 @@ return false;
 }
 
 10 == 10;
-10 != 9;".as_bytes();
+10 != 9;
+\"foobar\"
+\"foo bar\"
+".as_bytes();
 
         let tests = vec![
             Token::Let,
@@ -211,6 +229,8 @@ return false;
             Token::Neq,
             Token::Integer(9),
             Token::Semicolon,
+            Token::String("foobar".to_string()),
+            Token::String("foo bar".to_string()),
             Token::Eof,
         ];
 

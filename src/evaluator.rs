@@ -80,6 +80,12 @@ impl Evaluator {
                     _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
                 }
             }
+            (Object::String(left_val), Object::String(right_val)) => {
+                match operator.as_str() {
+                    "+" => Object::String(left_val.to_owned() + right_val),
+                    _ => Object::Error(format!("unknown operation: string {} string", operator))
+                }
+            }
             _ => {
                 if std::mem::discriminant(&left_eval) != std::mem::discriminant(&right_eval) {
                     Object::Error(format!("type mismatch: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
@@ -140,6 +146,7 @@ impl Evaluator {
                 self.env.get(&value).unwrap_or(Object::Error(format!("identifier not found: {}", value)))
             },
             Expression::Integer { value, .. } => Object::Integer(value),
+            Expression::String { value, .. } => Object::String(value),
             Expression::Boolean { value, .. } => Object::Boolean(value),
             Expression::Prefix { operator, right, .. } => {
                 self.evaluate_prefix_expression(operator, *right)
@@ -267,6 +274,19 @@ mod evaluator_tests {
             ("3 * 3 * 3 + 10", Object::Integer(37)),
             ("3 * (3 * 3) + 10", Object::Integer(37)),
             ("(5 + 10 * 2 + 15 / 3) * 2 + -10", Object::Integer(50)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_string_expression_eval() {
+        let tests = vec![
+            ("\"Hello World!\"", Object::String("Hello World!".to_string())),
+            ("\"Hello\" + \" \" + \"World!\"", Object::String("Hello World!".to_string())),
         ];
 
         for (input, expected) in tests {
@@ -409,6 +429,10 @@ mod evaluator_tests {
             (
                 "foobar",
                 Object::Error("identifier not found: foobar".to_owned()),
+            ),
+            (
+                "\"hello\" - \"world\"",
+                Object::Error("unknown operation: string - string".to_owned()),
             ),
         ];
 

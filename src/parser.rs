@@ -159,6 +159,7 @@ impl<'a> Parser<'a> {
             Token::Lparen => self.parse_grouped_expression(),
             Token::Identifier(_) => self.parse_identifier(),
             Token::Integer(_) => self.parse_integer_literal(),
+            Token::String(_) => self.parse_string_literal(),
             Token::True | Token::False => self.parse_boolean(),
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             _ => {
@@ -340,6 +341,23 @@ impl<'a> Parser<'a> {
             }
         };
         Some(Expression::Integer {
+            token: self.current_token.clone(),
+            value,
+        })
+    }
+
+    fn parse_string_literal(&mut self) -> Option<Expression> {
+        // TODO why do i need this clone?
+        let value = match self.current_token.clone() {
+            Token::String(value) => value,
+            _ => {
+                self.push_parse_error(
+                    &format!("expected string, but got {}", self.current_token)
+                );
+                return None;
+            }
+        };
+        Some(Expression::String {
             token: self.current_token.clone(),
             value,
         })
@@ -868,6 +886,28 @@ mod parser_tests {
                 value: Some(identifier("another_var")),
         }]);
         assert_eq!(format!("{}", program), "let my_var = another_var;")
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = "\"hello world\"".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![
+                Statement::Expression {
+                    token: Token::String("hello world".to_owned()),
+                    expression: Some(Expression::String { 
+                        token: Token::String("hello world".to_owned()),
+                        value: "hello world".to_string() 
+                    }),
+                }
+            ]),
+            program
+        );
     }
 }
 

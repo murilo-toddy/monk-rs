@@ -7,6 +7,7 @@ pub enum Token {
     // TODO add support for floats
     Identifier(String),
     Integer(i64),
+    String(String),
 
     // Operators
     Assign,
@@ -63,6 +64,7 @@ impl std::fmt::Display for Token {
             Token::Eof => write!(f, "\0"),
             Token::Identifier(v) => write!(f, "{}", v),
             Token::Integer(v) => write!(f, "{}", v),
+            Token::String(v) => write!(f, "{}", v),
             Token::Assign => write!(f, "="),
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),

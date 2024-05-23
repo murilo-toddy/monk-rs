@@ -33,6 +33,10 @@ pub enum Expression {
         token: Token,
         value: i64,
     },
+    String {
+        token: Token,
+        value: String,
+    },
     Boolean {
         token: Token,
         value: bool,
@@ -126,6 +130,7 @@ impl std::fmt::Display for Expression {
         match self {
             Expression::Identifier { value, .. } => write!(f, "{}", value),
             Expression::Integer { value, .. } => write!(f, "{}", value),
+            Expression::String { value, .. }  => write!(f, "{}", value),
             Expression::Boolean { value, .. } => write!(f, "{}", value),
             Expression::Prefix { operator, right, .. } => {
                 write!(f, "({}{})", operator, right)
