@@ -122,6 +122,18 @@ impl Evaluator {
         }
     }
 
+    fn evaluate_expressions(&mut self, expressions: Vec<Expression>) -> Vec<Object> {
+        let mut result = vec![];
+        for expression in expressions {
+            let evaluated = self.evaluate_expression(expression);
+            if self.is_error(&evaluated) {
+                return vec![evaluated];
+            }
+            result.push(evaluated);
+        }
+        return result;
+    }
+
     fn evaluate_expression(&mut self, expression: Expression) -> Object {
         match expression {
             Expression::Identifier { value, .. } => {
@@ -141,8 +153,45 @@ impl Evaluator {
             Expression::Function { arguments, body, .. } => {
                 Object::Function(arguments, body, self.env.clone())
             },
-            Expression::Call { .. } => todo!("not implemented"),
+            Expression::Call { function, arguments, .. } => {
+                let func = self.evaluate_expression(*function);
+                if self.is_error(&func) {
+                    return func;
+                } 
+                let args = self.evaluate_expressions(arguments);
+                if let Some(Object::Error(_)) = args.first() {
+                    return args[0].to_owned();
+                }
+                self.apply_function(func, args)
+            }
         }
+    }
+
+    fn apply_function(&mut self, func: Object, args: Vec<Object>) -> Object {
+        match func.clone() {
+            Object::Function(_, body, _) => {
+                let extended_env = self.extend_function_environment(func, args);
+                let mut extended_evaluator = Evaluator::new(extended_env);
+                let evaluated = extended_evaluator.evaluate_block_statement(body.to_owned());
+                match evaluated {
+                    Object::ReturnValue(value) => *value.to_owned(),
+                    _ => evaluated,
+                }
+            }
+            _ => Object::Error("expected function".to_owned())
+        }
+    }
+
+    fn extend_function_environment(&mut self, func: Object, args: Vec<Object>) -> Environment {
+        if let Object::Function(arguments, _, environment) = func {
+            let mut env = Environment::new_enclosed(environment);
+            for (i, arg) in arguments.iter().enumerate() {
+                // TODO remove clones
+                env.set(arg.value.clone(), args[i].clone());
+            }
+            return env;
+        }
+        panic!("branch cannot happen")
     }
 
     fn evaluate_statement(&mut self, statement: Statement) -> Option<Object> {
@@ -401,6 +450,33 @@ mod evaluator_tests {
                 assert_eq!(format!("{}", block), "(x + 2)");
             },
             _ => panic!("expected function object")
+        }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let tests = vec![
+            ("let identity = fn(x) { x; }; identity(5);", Object::Integer(5)),
+            ("let identity = fn(x) { return x; }; identity(5);", Object::Integer(5)),
+            ("let double = fn(x) { x * 2; }; double(5);", Object::Integer(10)),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", Object::Integer(10)),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", Object::Integer(20)),
+            ("fn(x) { x; }(5)", Object::Integer(5)),
+            (    
+                "
+                    let newAdder = fn(x) {
+                        fn(y) { x + y; };
+                    }
+                    let addTwo = newAdder(2);
+                    addTwo(2);
+                ",
+                Object::Integer(4),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
         }
     }
 }
