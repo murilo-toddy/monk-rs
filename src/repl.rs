@@ -1,5 +1,5 @@
 use std::io::{self, BufRead, Write};
-use crate::{lexer, parser, evaluator::evaluate_program, environment::Environment};
+use crate::{lexer, parser, evaluator::Evaluator, environment::Environment};
 
 fn print_parse_errors<W>(output: &mut W, errors: &Vec<parser::ParseError>) -> io::Result<()>
 where W: Write {
@@ -14,7 +14,8 @@ where
     R: BufRead,
     W: Write,
 {
-    let mut env = Environment::new();
+    let env = Environment::new();
+    let mut evaluator = Evaluator::new(env);
 
     output.write_all("\nMonkeyLang 0.1\n".as_bytes()).unwrap();
     output.write_all(">>> ".as_bytes()).unwrap();
@@ -30,7 +31,7 @@ where
                 continue;
             }
 
-            let evaluated = evaluate_program(program, &mut env);
+            let evaluated = evaluator.evaluate_program(program);
             match evaluated {
                 Some(obj) => output.write_all(obj.inspect().as_bytes())?,
                 None => continue,

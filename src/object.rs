@@ -1,6 +1,6 @@
 use crate::{environment::Environment, ast::{BlockStatement, Identifier}};
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
@@ -19,8 +19,8 @@ impl Object {
             Object::ReturnValue(value) => value.inspect(),
             Object::Error(message) => format!("ERROR: {}", message),
             Object::Function(params, body, _) => {
-                let p = params.iter().map(|p| p.value).collect::<Vec<String>>().join(", ");
-                format!("fn({}) {{\n{}\n}}", p, body)
+                let s = params.iter().map(|p| p.value.clone()).collect::<Vec<String>>().join(", ");
+                format!("fn({}) {{\n{}\n}}", s, body)
             },
         }
     }

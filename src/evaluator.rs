@@ -1,184 +1,199 @@
 use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}, environment::Environment};
 
-// TODO handle errors in a more rusty way
-fn is_error(object: &Object) -> bool {
-    matches!(object, Object::Error(_))
+pub struct Evaluator {
+    env: Environment,
 }
 
-fn is_truthy(object: Object) -> bool {
-    !matches!(object, Object::Boolean(false) | Object::Integer(0) | Object::Null)
-}
+impl Evaluator {
 
-fn evaluate_prefix_expression(operator: String, right: Expression, env: &mut Environment) -> Object {
-    let right_eval = evaluate_expression(right, env);
-    if is_error(&right_eval) {
-        return right_eval;
-    }
-    // TODO move the common error out
-    match operator.as_str() {
-        "!" => {
-            match right_eval {
-                Object::Boolean(value) => Object::Boolean(!value),
-                Object::Integer(value) => Object::Boolean(value == 0),
-                Object::Null => Object::Boolean(true),
-                _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
-            }
-        }
-        "-" => {
-            match right_eval {
-                Object::Integer(value) => Object::Integer(-value),
-                _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
-            }
-        }
-        _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
-    }
-}
-
-fn evaluate_infix_expression(
-    operator: String, 
-    left: Expression,
-    right: Expression,
-    env: &mut Environment
-) -> Object {
-    let left_eval = evaluate_expression(left, env);
-    if is_error(&left_eval) {
-        return left_eval;
-    }
-    let right_eval = evaluate_expression(right, env);
-    if is_error(&right_eval) {
-        return right_eval;
+    pub fn new(env: Environment) -> Evaluator {
+        Evaluator { env }
     }
 
-    match (&left_eval, &right_eval) {
-        (Object::Integer(left_val), Object::Integer(right_val)) => {
-            match operator.as_str() {
-                "+" => Object::Integer(left_val + right_val),
-                "-" => Object::Integer(left_val - right_val),
-                "*" => Object::Integer(left_val * right_val),
-                "/" => Object::Integer(left_val / right_val),
-                "==" => Object::Boolean(left_val == right_val),
-                "!=" => Object::Boolean(left_val != right_val),
-                ">" => Object::Boolean(left_val > right_val),
-                "<" => Object::Boolean(left_val < right_val),
-                _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
-            }
-        },
-        (Object::Boolean(left_val), Object::Boolean(right_val)) => {
-            match operator.as_str() {
-                "==" => Object::Boolean(left_val == right_val),
-                "!=" => Object::Boolean(left_val != right_val),
-                _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
-            }
+    // TODO handle errors in a more rusty way
+    fn is_error(&self, object: &Object) -> bool {
+        matches!(object, Object::Error(_))
+    }
+
+    fn is_truthy(&self, object: Object) -> bool {
+        !matches!(object, Object::Boolean(false) | Object::Integer(0) | Object::Null)
+    }
+
+    fn evaluate_prefix_expression(&mut self, operator: String, right: Expression) -> Object {
+        let right_eval = self.evaluate_expression(right);
+        if self.is_error(&right_eval) {
+            return right_eval;
         }
-        _ => {
-            if std::mem::discriminant(&left_eval) != std::mem::discriminant(&right_eval) {
-                Object::Error(format!("type mismatch: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
-            } else {
-                Object::Error(format!("unknown operation: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
+        // TODO move the common error out
+        match operator.as_str() {
+            "!" => {
+                match right_eval {
+                    Object::Boolean(value) => Object::Boolean(!value),
+                    Object::Integer(value) => Object::Boolean(value == 0),
+                    Object::Null => Object::Boolean(true),
+                    _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
+                }
             }
+            "-" => {
+                match right_eval {
+                    Object::Integer(value) => Object::Integer(-value),
+                    _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
+                }
+            }
+            _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
         }
     }
-}
 
-fn evaluate_block_statement(block: BlockStatement, env: &mut Environment) -> Object {
-    let mut result = None;
-    for statement in block.statements {
-        result = evaluate_statement(statement, env);
-        match result {
-            Some(Object::ReturnValue(_)) | Some(Object::Error(_)) => {
-                return result.unwrap();
+    fn evaluate_infix_expression(
+        &mut self,
+        operator: String, 
+        left: Expression,
+        right: Expression,
+    ) -> Object {
+        let left_eval = self.evaluate_expression(left);
+        if self.is_error(&left_eval) {
+            return left_eval;
+        }
+        let right_eval = self.evaluate_expression(right);
+        if self.is_error(&right_eval) {
+            return right_eval;
+        }
+
+        match (&left_eval, &right_eval) {
+            (Object::Integer(left_val), Object::Integer(right_val)) => {
+                match operator.as_str() {
+                    "+" => Object::Integer(left_val + right_val),
+                    "-" => Object::Integer(left_val - right_val),
+                    "*" => Object::Integer(left_val * right_val),
+                    "/" => Object::Integer(left_val / right_val),
+                    "==" => Object::Boolean(left_val == right_val),
+                    "!=" => Object::Boolean(left_val != right_val),
+                    ">" => Object::Boolean(left_val > right_val),
+                    "<" => Object::Boolean(left_val < right_val),
+                    _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
+                }
+            },
+            (Object::Boolean(left_val), Object::Boolean(right_val)) => {
+                match operator.as_str() {
+                    "==" => Object::Boolean(left_val == right_val),
+                    "!=" => Object::Boolean(left_val != right_val),
+                    _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
+                }
             }
-            _ => {}
+            _ => {
+                if std::mem::discriminant(&left_eval) != std::mem::discriminant(&right_eval) {
+                    Object::Error(format!("type mismatch: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
+                } else {
+                    Object::Error(format!("unknown operation: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
+                }
+            }
         }
     }
-    result.unwrap_or(Object::Null)
-}
 
-fn evaluate_conditional_expression(
-    condition: Expression, 
-    consequence: BlockStatement,
-    alternative: Option<BlockStatement>,
-    env: &mut Environment,
-) -> Object {
-    let condition_eval = evaluate_expression(condition, env);
-    if is_error(&condition_eval) {
-        return condition_eval;
-    }
-
-    if is_truthy(condition_eval) {
-        evaluate_block_statement(consequence, env)
-    } else {
-        alternative.map_or(Object::Null, |a| evaluate_block_statement(a, env))
-    }
-}
-
-fn evaluate_expression(expression: Expression, env: &mut Environment) -> Object {
-    match expression {
-        Expression::Identifier { value, .. } => {
-            env.get(&value).unwrap_or(Object::Error(format!("identifier not found: {}", value)))
-        },
-        Expression::Integer { value, .. } => Object::Integer(value),
-        Expression::Boolean { value, .. } => Object::Boolean(value),
-        Expression::Prefix { operator, right, .. } => {
-            evaluate_prefix_expression(operator, *right, env)
-        },
-        Expression::Infix { operator, left, right, .. } => {
-            evaluate_infix_expression(operator, *left, *right, env)
-        },
-        Expression::If { condition, consequence, alternative, .. } => {
-            evaluate_conditional_expression(*condition, consequence, alternative, env)
-        },
-        Expression::Function { .. } => todo!("not implemented"),
-        Expression::Call { .. } => todo!("not implemented"),
-    }
-}
-
-fn evaluate_statement(statement: Statement, env: &mut Environment) -> Option<Object> {
-    match statement {
-        Statement::Let { name, value, .. } => {
-            let value_eval = value.map(|v| evaluate_expression(v, env))?;
-            if is_error(&value_eval) {
-                return Some(value_eval);
+    fn evaluate_block_statement(&mut self, block: BlockStatement) -> Object {
+        let mut result = None;
+        for statement in block.statements {
+            result = self.evaluate_statement(statement);
+            match result {
+                Some(Object::ReturnValue(_)) | Some(Object::Error(_)) => {
+                    return result.unwrap();
+                }
+                _ => {}
             }
-            // TODO remove this clone
-            env.set(name.value, value_eval.clone());
-            Some(value_eval)
-        },
-        Statement::Return { value, .. } => {
-            let value_eval = value.map(|v| evaluate_expression(v, env))?;
-            Some(Object::ReturnValue(Box::new(value_eval)))
-        },
-        Statement::Expression { expression, .. } => expression.map(|v|  evaluate_expression(v, env)),
+        }
+        result.unwrap_or(Object::Null)
     }
-}
 
-pub fn evaluate_program(program: Program, env: &mut Environment) -> Option<Object> {
-    let mut result = None;
-    for statement in program.0 {
-        result = evaluate_statement(statement, env);
-        match result {
-            Some(Object::ReturnValue(result)) => return Some(*result),
-            Some(Object::Error(_)) => return result,
-            _ => {}
+    fn evaluate_conditional_expression(
+        &mut self,
+        condition: Expression, 
+        consequence: BlockStatement,
+        alternative: Option<BlockStatement>,
+        ) -> Object {
+        let condition_eval = self.evaluate_expression(condition);
+        if self.is_error(&condition_eval) {
+            return condition_eval;
+        }
+
+        if self.is_truthy(condition_eval) {
+            self.evaluate_block_statement(consequence)
+        } else {
+            alternative.map_or(Object::Null, |a| self.evaluate_block_statement(a))
         }
     }
-    result
+
+    fn evaluate_expression(&mut self, expression: Expression) -> Object {
+        match expression {
+            Expression::Identifier { value, .. } => {
+                self.env.get(&value).unwrap_or(Object::Error(format!("identifier not found: {}", value)))
+            },
+            Expression::Integer { value, .. } => Object::Integer(value),
+            Expression::Boolean { value, .. } => Object::Boolean(value),
+            Expression::Prefix { operator, right, .. } => {
+                self.evaluate_prefix_expression(operator, *right)
+            },
+            Expression::Infix { operator, left, right, .. } => {
+                self.evaluate_infix_expression(operator, *left, *right)
+            },
+            Expression::If { condition, consequence, alternative, .. } => {
+                self.evaluate_conditional_expression(*condition, consequence, alternative)
+            },
+            Expression::Function { arguments, body, .. } => {
+                Object::Function(arguments, body, self.env.clone())
+            },
+            Expression::Call { .. } => todo!("not implemented"),
+        }
+    }
+
+    fn evaluate_statement(&mut self, statement: Statement) -> Option<Object> {
+        match statement {
+            Statement::Let { name, value, .. } => {
+                let value_eval = value.map(|v| self.evaluate_expression(v))?;
+                if self.is_error(&value_eval) {
+                    return Some(value_eval);
+                }
+                // TODO remove this clone
+                self.env.set(name.value, value_eval.clone());
+                Some(value_eval)
+            },
+            Statement::Return { value, .. } => {
+                let value_eval = value.map(|v| self.evaluate_expression(v))?;
+                Some(Object::ReturnValue(Box::new(value_eval)))
+            },
+            Statement::Expression { expression, .. } => expression.map(|v|  self.evaluate_expression(v)),
+        }
+    }
+
+    pub fn evaluate_program(&mut self, program: Program) -> Option<Object> {
+        let mut result = None;
+        for statement in program.0 {
+            result = self.evaluate_statement(statement);
+            match result {
+                Some(Object::ReturnValue(result)) => return Some(*result),
+                Some(Object::Error(_)) => return result,
+                _ => {}
+            }
+        }
+        result
+    }
 }
+
 
 #[cfg(test)]
 mod evaluator_tests {
-    use crate::{lexer::Lexer, parser::Parser};
+    use crate::{lexer::Lexer, parser::Parser, ast::Identifier, token::Token};
 
     use super::*;
 
     fn eval_input(input: &str) -> Object {
-        let mut env = Environment::new();
+        let env = Environment::new();
+        let mut evaluator = Evaluator::new(env);
         let lexer = Lexer::new(input.as_bytes());
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
 
         assert_eq!(parser.get_errors().len(), 0);
-        return evaluate_program(program, &mut env).unwrap();
+        return evaluator.evaluate_program(program).unwrap();
     }
 
     #[test]
@@ -366,6 +381,26 @@ mod evaluator_tests {
         for (input, expected) in tests {
             let evaluated = eval_input(input);
             assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+    fn identifier(value: &str) -> Identifier {
+        Identifier {
+            token: Token::Identifier(value.to_owned()),
+            value: value.to_owned(),
+        }
+    }
+
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) { x + 2; };";
+        let evaluated = eval_input(input);
+        match evaluated {
+            Object::Function(params, block, ..) => {
+                assert_eq!(params, vec![identifier("x")]);
+                assert_eq!(format!("{}", block), "(x + 2)");
+            },
+            _ => panic!("expected function object")
         }
     }
 }
