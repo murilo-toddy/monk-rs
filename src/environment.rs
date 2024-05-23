@@ -8,6 +8,12 @@ pub struct Environment {
     outer: Option<Box<Environment>>,
 }
 
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Environment {
     pub fn new() -> Environment {
         Environment { 

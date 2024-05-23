@@ -137,7 +137,7 @@ impl Evaluator {
             }
             result.push(evaluated);
         }
-        return result;
+        result
     }
 
     fn evaluate_expression(&mut self, expression: Expression) -> Object {
