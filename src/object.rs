@@ -9,6 +9,7 @@ pub enum Object {
     Null,
     Error(String),
     Function(Vec<Identifier>, BlockStatement, Environment),
+    BuiltinFunction(fn(Vec<Object>) -> Object),
 }
 
 impl Object {
@@ -24,6 +25,7 @@ impl Object {
                 let s = params.iter().map(|p| p.value.clone()).collect::<Vec<String>>().join(", ");
                 format!("fn({}) {{\n{}\n}}", s, body)
             },
+            Object::BuiltinFunction(_) => format!("builtin function")
         }
     }
 }

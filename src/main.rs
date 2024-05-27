@@ -8,6 +8,7 @@ pub mod parser;
 pub mod object;
 pub mod evaluator;
 pub mod environment;
+pub mod builtins;
 
 fn main() -> io::Result<()> {
     let input = io::stdin();

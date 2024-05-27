@@ -1,13 +1,16 @@
-use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}, environment::Environment};
+use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}, environment::Environment, builtins::BuiltinFunctions};
 
 pub struct Evaluator {
     env: Environment,
+    builtin: BuiltinFunctions,
 }
 
 impl Evaluator {
-
     pub fn new(env: Environment) -> Evaluator {
-        Evaluator { env }
+        Evaluator { 
+            env,
+            builtin: BuiltinFunctions::new(),
+        }
     }
 
     // TODO handle errors in a more rusty way
@@ -115,7 +118,7 @@ impl Evaluator {
         condition: Expression, 
         consequence: BlockStatement,
         alternative: Option<BlockStatement>,
-        ) -> Object {
+    ) -> Object {
         let condition_eval = self.evaluate_expression(condition);
         if self.is_error(&condition_eval) {
             return condition_eval;
@@ -143,7 +146,9 @@ impl Evaluator {
     fn evaluate_expression(&mut self, expression: Expression) -> Object {
         match expression {
             Expression::Identifier { value, .. } => {
-                self.env.get(&value).unwrap_or(Object::Error(format!("identifier not found: {}", value)))
+                self.env.get(&value)
+                    .or_else(|| self.builtin.get_function_object(&value))
+                    .unwrap_or(Object::Error(format!("identifier not found: {}", value)))
             },
             Expression::Integer { value, .. } => Object::Integer(value),
             Expression::String { value, .. } => Object::String(value),
@@ -184,7 +189,8 @@ impl Evaluator {
                     Object::ReturnValue(value) => *value.to_owned(),
                     _ => evaluated,
                 }
-            }
+            },
+            Object::BuiltinFunction(func) => func(args),
             _ => Object::Error("expected function".to_owned())
         }
     }
@@ -496,6 +502,21 @@ mod evaluator_tests {
                 ",
                 Object::Integer(4),
             ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+    #[test]
+    fn test_builtin_function() {
+        let tests = [
+            ("len(\"\")", Object::Integer(0)),
+            ("len(\"four\")", Object::Integer(4)),
+            ("len(1)", Object::Error("argument to `len` not supported".to_owned())),
+            ("len(\"one\", \"two\")", Object::Error("wrong number of arguments on function `len`. got=2, want=1".to_owned())),
         ];
 
         for (input, expected) in tests {
