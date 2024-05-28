@@ -25,6 +25,8 @@ pub enum Token {
 
     Lparen,
     Rparen,
+    Lbracket,
+    Rbracket,
     Lbrace,
     Rbrace,
 
@@ -77,6 +79,8 @@ impl std::fmt::Display for Token {
             Token::Semicolon => write!(f, ";"),
             Token::Lparen => write!(f, "("),
             Token::Rparen => write!(f, ")"),
+            Token::Lbracket => write!(f, "["),
+            Token::Rbracket => write!(f, "]"),
             Token::Lbrace => write!(f, "{{"),
             Token::Rbrace => write!(f, "}}"),
             Token::Function => write!(f, "fn"),

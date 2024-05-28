@@ -67,6 +67,15 @@ pub enum Expression {
         token: Token, // Token::Lparen
         function: Box<Expression>, // Idenifier or Function
         arguments: Vec<Expression>,
+    },
+    Array {
+        token: Token, // Token::Lbracket
+        elements: Vec<Expression>,
+    },
+    Index {
+        token: Token, // Token::Lbracket
+        left: Box<Expression>,
+        index: Box<Expression>,
     }
 }
 
@@ -88,6 +97,7 @@ pub enum Precedence {
     Product = 5,     // *
     Prefix = 6,      // -x or !x
     Call = 7,        // func(x)
+    Index = 8,       // arr[i]
 }
 
 
@@ -165,6 +175,16 @@ impl std::fmt::Display for Expression {
 
                 write!(f, ")")
             },
+            Expression::Array { elements, .. } => {
+                write!(f, "[{}]", elements
+                    .iter()
+                    .map(|e| format!("{}", e))
+                    .collect::<Vec<String>>()
+                    .join(", "))
+            },
+            Expression::Index { left, index, .. } => {
+                write!(f, "({}[{}])", left, index)
+            }
         }
     }
 }

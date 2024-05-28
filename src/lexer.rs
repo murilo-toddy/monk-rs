@@ -102,6 +102,8 @@ impl<'a> Lexer<'a> {
             '(' => Token::Lparen,
             ')' => Token::Rparen,
             ',' => Token::Comma,
+            '[' => Token::Lbracket,
+            ']' => Token::Rbracket,
             '{' => Token::Lbrace,
             '}' => Token::Rbrace,
             '"' => Token::String(self.read_string()),
@@ -153,6 +155,7 @@ return false;
 10 != 9;
 \"foobar\"
 \"foo bar\"
+[1, 2];
 ".as_bytes();
 
         let tests = vec![
@@ -231,6 +234,12 @@ return false;
             Token::Semicolon,
             Token::String("foobar".to_string()),
             Token::String("foo bar".to_string()),
+            Token::Lbracket,
+            Token::Integer(1),
+            Token::Comma,
+            Token::Integer(2),
+            Token::Rbracket,
+            Token::Semicolon,
             Token::Eof,
         ];
 

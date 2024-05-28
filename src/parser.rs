@@ -76,6 +76,7 @@ impl<'a> Parser<'a> {
 
     fn precedence_from_token(&self, token: &Token) -> Precedence {
         match token {
+            Token::Lbracket => Precedence::Index,
             Token::Lparen => Precedence::Call,
             Token::Asterisk | Token::Slash => Precedence::Product,
             Token::Plus | Token::Minus => Precedence::Sum,
@@ -151,10 +152,48 @@ impl<'a> Parser<'a> {
         Some(Statement::Return { token, value })
     }
 
+    fn parse_expression_list(&mut self, end: Token) -> Option<Vec<Expression>> {
+        let mut list = Vec::new();
+        if self.peek_token_is(&end) {
+            self.next();
+            return Some(list);
+        }
+
+        self.next();
+        list.push(self.parse_expression(Precedence::Lowest)?);
+
+        while self.peek_token_is(&Token::Comma) {
+            self.next();
+            self.next();
+            list.push(self.parse_expression(Precedence::Lowest)?);
+        }
+
+        if !self.expect_peek(&end) {
+            return None;
+        }
+        Some(list)
+    }
+
+    fn parse_array_literal(&mut self) -> Option<Expression> {
+        let elements = self.parse_expression_list(Token::Rbracket)?;
+        Some(Expression::Array { token: Token::Lbracket, elements })
+    }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Option<Expression> {
+        let token = self.current_token.clone();
+        self.next();
+        let index = self.parse_expression(Precedence::Lowest)?;
+        if !self.expect_peek(&Token::Rbracket) {
+            return None
+        }
+        Some(Expression::Index { token, left: Box::new(left), index: Box::new(index) })
+    }
+
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
         // prefix expressions
         let mut left_expression = match &self.current_token {
             Token::Function => self.parse_function_literal(),
+            Token::Lbracket => self.parse_array_literal(),
             Token::If => self.parse_if_expression(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::Identifier(_) => self.parse_identifier(),
@@ -187,6 +226,10 @@ impl<'a> Parser<'a> {
                 Token::Lparen => {
                     self.next();
                     self.parse_call_expression(left_expression?)
+                },
+                Token::Lbracket => {
+                    self.next();
+                    self.parse_index_expression(left_expression?)
                 },
                 _ => {
                     return left_expression;
@@ -394,35 +437,11 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
-        let mut arguments = Vec::new();
-
-        if self.peek_token_is(&Token::Rparen) {
-            self.next();
-            return Some(arguments);
-        }
-
-        self.next();
-        arguments.push(self.parse_expression(Precedence::Lowest)?);
-
-        while self.peek_token_is(&Token::Comma) {
-            self.next();
-            self.next();
-            arguments.push(self.parse_expression(Precedence::Lowest)?);
-        }
-
-        if !self.expect_peek(&Token::Rparen) {
-            return None;
-        }
-
-        Some(arguments)
-    }
-
     fn parse_call_expression(&mut self, left: Expression) -> Option<Expression> {
         Some(Expression::Call {
             token: self.current_token.clone(),
             function: Box::new(left),
-            arguments: self.parse_call_arguments()?,
+            arguments: self.parse_expression_list(Token::Rparen)?,
         })
     }
 
@@ -647,8 +666,8 @@ mod parser_tests {
         }
     }
 
-    fn infix_template(left: i64, op: &str, op_token: Token, right: i64) -> Vec<Statement> {
-        vec![Statement::Expression {
+    fn infix_template(left: i64, op: &str, op_token: Token, right: i64) -> Statement {
+        Statement::Expression {
             token: Token::Integer(left),
             expression: Some(Expression::Infix {
                 token: op_token,
@@ -656,20 +675,20 @@ mod parser_tests {
                 left: Box::new(integer(left)),
                 right: Box::new(integer(right)),
             })
-        }]
+        }
     }
 
     #[test]
     fn test_infix_expression() {
         let tests = vec![
-            ("5 + 5;", Program(infix_template(5, "+", Token::Plus, 5))),
-            ("5 - 5;", Program(infix_template(5, "-", Token::Minus, 5))),
-            ("5 * 5;", Program(infix_template(5, "*", Token::Asterisk, 5))),
-            ("5 / 5;", Program(infix_template(5, "/", Token::Slash, 5))),
-            ("5 > 5;", Program(infix_template(5, ">", Token::Gt, 5))),
-            ("5 < 5;", Program(infix_template(5, "<", Token::Lt, 5))),
-            ("5 == 5;", Program(infix_template(5, "==", Token::Eq, 5))),
-            ("5 != 5;", Program(infix_template(5, "!=", Token::Neq, 5))),
+            ("5 + 5;", Program(vec![infix_template(5, "+", Token::Plus, 5)])),
+            ("5 - 5;", Program(vec![infix_template(5, "-", Token::Minus, 5)])),
+            ("5 * 5;", Program(vec![infix_template(5, "*", Token::Asterisk, 5)])),
+            ("5 / 5;", Program(vec![infix_template(5, "/", Token::Slash, 5)])),
+            ("5 > 5;", Program(vec![infix_template(5, ">", Token::Gt, 5)])),
+            ("5 < 5;", Program(vec![infix_template(5, "<", Token::Lt, 5)])),
+            ("5 == 5;", Program(vec![infix_template(5, "==", Token::Eq, 5)])),
+            ("5 != 5;", Program(vec![infix_template(5, "!=", Token::Neq, 5)])),
         ]; 
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
@@ -863,6 +882,8 @@ mod parser_tests {
             ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
             ("add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))", "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))"),
             ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"),
+            ("a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"),
+            ("add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))"),
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
@@ -903,6 +924,76 @@ mod parser_tests {
                     expression: Some(Expression::String { 
                         token: Token::String("hello world".to_owned()),
                         value: "hello world".to_string() 
+                    }),
+                }
+            ]),
+            program
+        );
+    }
+
+    #[test]
+    fn test_array_literal() {
+        let input = "[1, 2 * 2, 3 + 3]".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![
+                Statement::Expression {
+                    token: Token::Lbracket,
+                    expression: Some(Expression::Array { 
+                        token: Token::Lbracket,
+                        elements: vec![
+                            Expression::Integer {
+                                token: Token::Integer(1),
+                                value: 1,
+                            },
+                            Expression::Infix {
+                                token: Token::Asterisk,
+                                operator: "*".to_owned(),
+                                left: Box::new(integer(2)),
+                                right: Box::new(integer(2)),
+                            },
+                            Expression::Infix {
+                                token: Token::Plus,
+                                operator: "+".to_owned(),
+                                left: Box::new(integer(3)),
+                                right: Box::new(integer(3)),
+                            },
+                        ],
+                    }),
+                }
+            ]),
+            program
+        );
+    }
+
+    #[test]
+    fn test_index_exprtession() {
+        let input = "myArray[1 + 1]".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![
+                Statement::Expression {
+                    token: Token::Identifier("myArray".to_owned()),
+                    expression: Some(Expression::Index { 
+                        token: Token::Lbracket,
+                        left: Box::new(Expression::Identifier { 
+                            token: Token::Identifier("myArray".to_owned()),
+                            value: "myArray".to_owned()
+                        }),
+                        index: Box::new(Expression::Infix {
+                            token: Token::Plus,
+                            operator: "+".to_owned(),
+                            left: Box::new(integer(1)),
+                            right: Box::new(integer(1)),
+                        }),
                     }),
                 }
             ]),

@@ -143,6 +143,18 @@ impl Evaluator {
         result
     }
 
+    fn evaluate_index_expression(&mut self, left: Object, index: Object) -> Object {
+        match (left, index) {
+            (Object::Array(elements), Object::Integer(index)) => {
+                if index < 0 || index as usize > elements.len() - 1 {
+                    return Object::Null
+                }
+                elements[index as usize].clone()
+            },
+            _ => Object::Error("index operator not supported".to_owned())
+        }
+    }
+
     fn evaluate_expression(&mut self, expression: Expression) -> Object {
         match expression {
             Expression::Identifier { value, .. } => {
@@ -176,6 +188,24 @@ impl Evaluator {
                 }
                 self.apply_function(func, args)
             }
+            Expression::Array { elements, .. } => {
+                let elements = self.evaluate_expressions(elements);
+                if elements.len() == 1 && self.is_error(&elements[0]) {
+                    return elements[0].to_owned();
+                }
+                Object::Array(elements)
+            },
+            Expression::Index { left, index, .. } => {
+                let left_exp = self.evaluate_expression(*left);
+                if self.is_error(&left_exp) {
+                    return left_exp;
+                }
+                let index_exp = self.evaluate_expression(*index);
+                if self.is_error(&index_exp) {
+                    return index_exp;
+                }
+                return self.evaluate_index_expression(left_exp, index_exp);
+            },
         }
     }
 
@@ -517,6 +547,39 @@ mod evaluator_tests {
             ("len(\"four\")", Object::Integer(4)),
             ("len(1)", Object::Error("argument to `len` not supported".to_owned())),
             ("len(\"one\", \"two\")", Object::Error("wrong number of arguments on function `len`. got=2, want=1".to_owned())),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let tests = [
+            ("[1, 2 * 2, 3 + 3]", Object::Array(vec![Object::Integer(1), Object::Integer(4), Object::Integer(6)])),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+    #[test]
+    fn test_index_expression() {
+        let tests = [
+            ("[1, 2, 3][0]", Object::Integer(1)),
+            ("[1, 2, 3][1]", Object::Integer(2)),
+            ("[1, 2, 3][2]", Object::Integer(3)),
+            ("let i = 0; [1][i];", Object::Integer(1)),
+            ("[1, 2, 3][1 + 1];", Object::Integer(3)),
+            ("let myArray = [1, 2, 3]; myArray[2];", Object::Integer(3)),
+            ("let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", Object::Integer(6)),
+            ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", Object::Integer(2)),
+            ("[1, 2, 3][3]", Object::Null),
+            ("[1, 2, 3][-1]", Object::Null),
         ];
 
         for (input, expected) in tests {
