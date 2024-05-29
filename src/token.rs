@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Token {
     Illegal(char),
     Eof,
@@ -21,6 +21,7 @@ pub enum Token {
     Lt,
 
     Comma,
+    Colon,
     Semicolon,
 
     Lparen,
@@ -76,6 +77,7 @@ impl std::fmt::Display for Token {
             Token::Gt => write!(f, ">"),
             Token::Lt => write!(f, "<"),
             Token::Comma => write!(f, ","),
+            Token::Colon => write!(f, ":"),
             Token::Semicolon => write!(f, ";"),
             Token::Lparen => write!(f, "("),
             Token::Rparen => write!(f, ")"),

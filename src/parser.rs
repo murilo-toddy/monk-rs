@@ -179,6 +179,27 @@ impl<'a> Parser<'a> {
         Some(Expression::Array { token: Token::Lbracket, elements })
     }
 
+    fn parse_hash_literal(&mut self) -> Option<Expression> {
+        let mut pairs: Vec<(Expression, Expression)> = Vec::new();
+        while !self.peek_token_is(&Token::Rbrace) {
+            self.next();
+            let key = self.parse_expression(Precedence::Lowest)?;
+            if !self.expect_peek(&Token::Colon) {
+                return None;
+            }
+            self.next();
+            let value = self.parse_expression(Precedence::Lowest)?;
+            pairs.push((key, value));
+            if !self.peek_token_is(&Token::Rbrace) && !self.expect_peek(&Token::Comma) {
+                return None;
+            }
+        }
+        if !self.expect_peek(&Token::Rbrace) {
+            return None;
+        }
+        Some(Expression::Hash { token: Token::Lbrace, pairs })
+    }
+
     fn parse_index_expression(&mut self, left: Expression) -> Option<Expression> {
         let token = self.current_token.clone();
         self.next();
@@ -194,6 +215,7 @@ impl<'a> Parser<'a> {
         let mut left_expression = match &self.current_token {
             Token::Function => self.parse_function_literal(),
             Token::Lbracket => self.parse_array_literal(),
+            Token::Lbrace => self.parse_hash_literal(),
             Token::If => self.parse_if_expression(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::Identifier(_) => self.parse_identifier(),
@@ -494,6 +516,13 @@ mod parser_tests {
         Expression::Integer {
             token: Token::Integer(value),
             value,
+        }
+    }
+
+    fn string(value: &str) -> Expression {
+        Expression::String {
+            token: Token::String(value.to_owned()),
+            value: value.to_owned(),
         }
     }
 
@@ -962,6 +991,103 @@ mod parser_tests {
                                 left: Box::new(integer(3)),
                                 right: Box::new(integer(3)),
                             },
+                        ],
+                    }),
+                }
+            ]),
+            program
+        );
+    }
+
+    #[test]
+    fn test_empty_hash_literal() {
+        let input = "{}".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![
+                Statement::Expression {
+                    token: Token::Lbrace,
+                    expression: Some(Expression::Hash { 
+                        token: Token::Lbrace,
+                        pairs: vec![],
+                    }),
+                }
+            ]),
+            program
+        );
+    }
+
+    #[test]
+    fn test_hash_literal_string_keys() {
+        let input = "{\"one\": 1, \"two\": 2}".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![
+                Statement::Expression {
+                    token: Token::Lbrace,
+                    expression: Some(Expression::Hash { 
+                        token: Token::Lbrace,
+                        pairs: vec![
+                            (string("one"), integer(1)),
+                            (string("two"), integer(2)),
+                        ],
+                    }),
+                }
+            ]),
+            program
+        );
+    }
+
+    #[test]
+    fn test_hash_literal_with_expressions() {
+        let input = "{\"one\": 0 + 1, \"two\": 10 - 8, true: 15/5}".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![
+                Statement::Expression {
+                    token: Token::Lbrace,
+                    expression: Some(Expression::Hash { 
+                        token: Token::Lbrace,
+                        pairs: vec![
+                            (
+                                string("one"),
+                                Expression::Infix {
+                                    token: Token::Plus,
+                                    operator: "+".to_owned(),
+                                    left: Box::new(integer(0)),
+                                    right: Box::new(integer(1)),
+                                },
+                            ),
+                            (
+                                string("two"), 
+                                Expression::Infix {
+                                    token: Token::Minus,
+                                    operator: "-".to_owned(),
+                                    left: Box::new(integer(10)),
+                                    right: Box::new(integer(8)),
+                                },
+                            ),
+                            (
+                                boolean(true), 
+                                Expression::Infix {
+                                    token: Token::Slash,
+                                    operator: "/".to_owned(),
+                                    left: Box::new(integer(15)),
+                                    right: Box::new(integer(5)),
+                                },
+                            ),
                         ],
                     }),
                 }

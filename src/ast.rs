@@ -1,12 +1,12 @@
 use crate::token::Token;
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone, Hash)]
 pub struct Identifier { 
     pub token: Token,
     pub value: String,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Statement {
     Let {
         token: Token,
@@ -23,7 +23,7 @@ pub enum Statement {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Expression {
     Identifier {
         token: Token,
@@ -72,6 +72,10 @@ pub enum Expression {
         token: Token, // Token::Lbracket
         elements: Vec<Expression>,
     },
+    Hash {
+        token: Token,
+        pairs: Vec<(Expression, Expression)>
+    },
     Index {
         token: Token, // Token::Lbracket
         left: Box<Expression>,
@@ -79,7 +83,7 @@ pub enum Expression {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Statement>,
@@ -179,6 +183,13 @@ impl std::fmt::Display for Expression {
                 write!(f, "[{}]", elements
                     .iter()
                     .map(|e| format!("{}", e))
+                    .collect::<Vec<String>>()
+                    .join(", "))
+            },
+            Expression::Hash { pairs, .. } => {
+                write!(f, "{{{}}}", pairs 
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
                     .collect::<Vec<String>>()
                     .join(", "))
             },

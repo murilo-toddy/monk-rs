@@ -13,6 +13,11 @@ impl Default for BuiltinFunctions {
 }
 
 impl BuiltinFunctions {
+    fn print_function(args: Vec<Object>) -> Object {
+        args.iter().for_each(|arg| println!("{}", arg.inspect()));
+        Object::Null
+    }
+
     fn len_function(args: Vec<Object>) -> Object {
         if args.len() != 1 {
             return Object::Error(
@@ -101,6 +106,7 @@ impl BuiltinFunctions {
             ("last".to_owned(), BuiltinFunctions::last_function as fn(Vec<Object>) -> Object),
             ("rest".to_owned(), BuiltinFunctions::rest_function as fn(Vec<Object>) -> Object),
             ("push".to_owned(), BuiltinFunctions::push_function as fn(Vec<Object>) -> Object),
+            ("print".to_owned(), BuiltinFunctions::print_function as fn(Vec<Object>) -> Object),
         ];
         functions
             .iter()

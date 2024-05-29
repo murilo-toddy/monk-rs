@@ -98,6 +98,7 @@ impl<'a> Lexer<'a> {
             '/' => Token::Slash,
             '>' => Token::Gt,
             '<' => Token::Lt,
+            ':' => Token::Colon,
             ';' => Token::Semicolon,
             '(' => Token::Lparen,
             ')' => Token::Rparen,
@@ -156,6 +157,7 @@ return false;
 \"foobar\"
 \"foo bar\"
 [1, 2];
+{\"foo\": \"bar\"};
 ".as_bytes();
 
         let tests = vec![
@@ -239,6 +241,12 @@ return false;
             Token::Comma,
             Token::Integer(2),
             Token::Rbracket,
+            Token::Semicolon,
+            Token::Lbrace,
+            Token::String("foo".to_string()),
+            Token::Colon,
+            Token::String("bar".to_string()),
+            Token::Rbrace,
             Token::Semicolon,
             Token::Eof,
         ];

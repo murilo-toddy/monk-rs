@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}, environment::Environment, builtins::BuiltinFunctions};
 
 pub struct Evaluator {
@@ -144,15 +146,35 @@ impl Evaluator {
     }
 
     fn evaluate_index_expression(&mut self, left: Object, index: Object) -> Object {
-        match (left, index) {
+        // TODO remove clone if possible
+        match (left, index.clone()) {
             (Object::Array(elements), Object::Integer(index)) => {
                 if index < 0 || index as usize > elements.len() - 1 {
                     return Object::Null
                 }
                 elements[index as usize].clone()
             },
+            (Object::Hash(elements), _) => {
+                elements.get(&index).map(|v| v.to_owned()).unwrap_or(Object::Null)
+            }
             _ => Object::Error("index operator not supported".to_owned())
         }
+    }
+
+    fn evaluate_hash_literal(&mut self, pairs: Vec<(Expression, Expression)>) -> Object {
+        let mut hash_map = HashMap::new();
+        for (key, value) in pairs {
+            let eval_key = self.evaluate_expression(key);
+            if self.is_error(&eval_key) {
+                return eval_key;
+            }
+            let eval_value = self.evaluate_expression(value);
+            if self.is_error(&eval_value) {
+                return eval_value;
+            }
+            hash_map.insert(eval_key, eval_value);
+        }
+        Object::Hash(hash_map)
     }
 
     fn evaluate_expression(&mut self, expression: Expression) -> Object {
@@ -195,6 +217,7 @@ impl Evaluator {
                 }
                 Object::Array(elements)
             },
+            Expression::Hash { pairs, .. } => self.evaluate_hash_literal(pairs),
             Expression::Index { left, index, .. } => {
                 let left_exp = self.evaluate_expression(*left);
                 if self.is_error(&left_exp) {
@@ -273,6 +296,8 @@ impl Evaluator {
 
 #[cfg(test)]
 mod evaluator_tests {
+    use std::collections::HashMap;
+
     use crate::{lexer::Lexer, parser::Parser, ast::Identifier, token::Token};
 
     use super::*;
@@ -568,6 +593,36 @@ mod evaluator_tests {
     }
 
     #[test]
+    fn test_hash_literals() {
+        let tests = [
+            (
+                "let two = \"two\";
+                 {
+                    \"one\": 10-9,
+                    two: 1 + 1,
+                    \"thr\" + \"ee\": 6 / 2,
+                    4: 4,
+                    true: 5,
+                    false: 6
+                 }",
+                Object::Hash(HashMap::from([
+                    (Object::String("one".to_owned()), Object::Integer(1)), 
+                    (Object::String("two".to_owned()), Object::Integer(2)), 
+                    (Object::String("three".to_owned()), Object::Integer(3)), 
+                    (Object::Integer(4), Object::Integer(4)), 
+                    (Object::Boolean(true), Object::Integer(5)), 
+                    (Object::Boolean(false), Object::Integer(6)), 
+                ]))
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+    #[test]
     fn test_index_expression() {
         let tests = [
             ("[1, 2, 3][0]", Object::Integer(1)),
@@ -580,6 +635,13 @@ mod evaluator_tests {
             ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", Object::Integer(2)),
             ("[1, 2, 3][3]", Object::Null),
             ("[1, 2, 3][-1]", Object::Null),
+            ("{\"foo\": 5}[\"foo\"]", Object::Integer(5)),
+            ("{\"foo\": 5}[\"bar\"]",Object::Null),
+            ("let key = \"foo\"; {\"foo\": 5}[key]", Object::Integer(5)),
+            ("{}[\"foo\"]", Object::Null),
+            ("{5: 5}[5]", Object::Integer(5)),
+            ("{true: 5}[true]", Object::Integer(5)),
+            ("{false: 5}[false]", Object::Integer(5)),
         ];
 
         for (input, expected) in tests {
