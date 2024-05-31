@@ -227,7 +227,7 @@ impl Evaluator {
                 if self.is_error(&index_exp) {
                     return index_exp;
                 }
-                return self.evaluate_index_expression(left_exp, index_exp);
+                self.evaluate_index_expression(left_exp, index_exp)
             },
         }
     }

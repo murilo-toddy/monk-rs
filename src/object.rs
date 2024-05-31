@@ -29,7 +29,7 @@ impl Object {
                 let s = params.iter().map(|p| p.value.clone()).collect::<Vec<String>>().join(", ");
                 format!("fn({}) {{\n{}\n}}", s, body)
             },
-            Object::BuiltinFunction(_) => format!("builtin function"),
+            Object::BuiltinFunction(_) => "builtin function".to_owned(),
             Object::Array(elements) => {
                 format!("[{}]", elements.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", "))
             },

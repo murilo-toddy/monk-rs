@@ -39,10 +39,10 @@ impl BuiltinFunctions {
         }
         match args[0] {
             Object::Array(ref elems) => {
-                if elems.len() < 1 {
+                if elems.is_empty() {
                     return Object::Null;
                 }
-                return elems[0].to_owned();
+                elems[0].to_owned()
             }
             _ => Object::Error("argument to `first` not supported".to_owned())
         }
@@ -56,10 +56,10 @@ impl BuiltinFunctions {
         }
         match args[0] {
             Object::Array(ref elems) => {
-                if elems.len() < 1 {
+                if elems.is_empty() {
                     return Object::Null;
                 }
-                return elems[elems.len() - 1].to_owned();
+                elems[elems.len() - 1].to_owned()
             }
             _ => Object::Error("argument to `last` not supported".to_owned())
         }
@@ -73,10 +73,10 @@ impl BuiltinFunctions {
         }
         match args[0] {
             Object::Array(ref elems) => {
-                if elems.len() < 1 {
+                if elems.is_empty() {
                     return Object::Null;
                 }
-                return Object::Array(elems[1..].to_owned());
+                Object::Array(elems[1..].to_owned())
             }
             _ => Object::Error("argument to `rest` not supported".to_owned())
         }

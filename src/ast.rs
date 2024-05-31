@@ -52,6 +52,7 @@ pub enum Expression {
         left: Box<Expression>,
         right: Box<Expression>,
     },
+    // TODO add else if
     If {
         token: Token,
         condition: Box<Expression>,
