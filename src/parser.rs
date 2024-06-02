@@ -217,6 +217,7 @@ impl<'a> Parser<'a> {
             Token::Lbracket => self.parse_array_literal(),
             Token::Lbrace => self.parse_hash_literal(),
             Token::If => self.parse_if_expression(),
+            Token::While => self.parse_while_expression(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::Identifier(_) => self.parse_identifier(),
             Token::Integer(_) => self.parse_integer_literal(),
@@ -313,6 +314,26 @@ impl<'a> Parser<'a> {
             condition: Box::new(condition.unwrap()),
             consequence,
             alternative,
+        })
+    }
+
+    fn parse_while_expression(&mut self) -> Option<Expression> {
+        let current_token = self.current_token.clone();
+        if !self.expect_peek(&Token::Lparen) {
+            return None;
+        }
+        self.next();
+        let condition = self.parse_expression(Precedence::Lowest);
+        if !self.expect_peek(&Token::Rparen) {
+            return None;
+        }
+        if !self.expect_peek(&Token::Lbrace) {
+            return None;
+        }
+        Some(Expression::While {
+            token: current_token,
+            condition: Box::new(condition.unwrap()),
+            statement: self.parse_block_statement(),
         })
     }
 
@@ -760,6 +781,40 @@ mod parser_tests {
                     alternative: None,
                 })
            }]),
+            program
+        );
+    }
+
+    #[test]
+    fn test_while_statement() {
+        let input = "while (x < y) { x }".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![Statement::Expression {
+                token: Token::While,
+                expression: Some(Expression::While {
+                    token: Token::While,
+                    condition: Box::new(Expression::Infix {
+                        token: Token::Lt,
+                        operator: "<".to_owned(),
+                        left: Box::new(identifier("x")),
+                        right: Box::new(identifier("y")),
+                    }),
+                    statement: BlockStatement {
+                        token: Token::Lbrace,
+                        statements: vec![
+                            Statement::Expression {
+                                token: Token::Identifier("x".to_owned()), 
+                                expression: Some(identifier("x")),
+                            },
+                        ],
+                    },
+                })
+            }]),
             program
         );
     }

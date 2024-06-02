@@ -158,6 +158,9 @@ return false;
 \"foo bar\"
 [1, 2];
 {\"foo\": \"bar\"};
+while (x < 10) {
+x + 1
+}
 ".as_bytes();
 
         let tests = vec![
@@ -248,6 +251,17 @@ return false;
             Token::String("bar".to_string()),
             Token::Rbrace,
             Token::Semicolon,
+            Token::While,
+            Token::Lparen,
+            Token::Identifier("x".to_string()),
+            Token::Lt,
+            Token::Integer(10),
+            Token::Rparen,
+            Token::Lbrace,
+            Token::Identifier("x".to_string()),
+            Token::Plus,
+            Token::Integer(1),
+            Token::Rbrace,
             Token::Eof,
         ];
 

@@ -32,11 +32,11 @@ pub enum Token {
     Rbrace,
 
     // Keywords
-    // TODO add loops
     Function,
     Let,
     If,
     Else,
+    While,
     Return,
     True,
     False,
@@ -52,6 +52,7 @@ impl Token {
             "let" => Token::Let,
             "if" => Token::If,
             "else" => Token::Else,
+            "while" => Token::While,
             "return" => Token::Return,
             "true" => Token::True,
             "false" => Token::False,
@@ -89,6 +90,7 @@ impl std::fmt::Display for Token {
             Token::Let => write!(f, "let"),
             Token::If => write!(f, "if"),
             Token::Else => write!(f, "else"),
+            Token::While => write!(f, "while"),
             Token::Return => write!(f, "return"),
             Token::True => write!(f, "true"),
             Token::False => write!(f, "false"),

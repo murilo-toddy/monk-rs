@@ -59,6 +59,11 @@ pub enum Expression {
         consequence: BlockStatement,
         alternative: Option<BlockStatement>,
     },
+    While {
+        token: Token,
+        condition: Box<Expression>,
+        statement: BlockStatement,
+    },
     Function {
         token: Token,
         arguments: Vec<Identifier>,
@@ -159,6 +164,9 @@ impl std::fmt::Display for Expression {
                     write!(f, "else {}", alt)?;
                 }
                 Ok(())
+            },
+            Expression::While { condition, statement, .. } => {
+                write!(f, "if {} {}", condition, statement)
             },
             Expression::Function { arguments, body, .. } => {
                 write!(f, "fn(")?;

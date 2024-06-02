@@ -36,6 +36,15 @@ let x = if (10 > 5) {
 }
 ```
 
+### While loops
+
+```monkey
+let i = 0;
+let j = while (i < 2) {
+    let i = i + 1;
+}
+```
+
 ### Functions and closures
 
 ```monkey
@@ -52,11 +61,17 @@ addTwo(5) == 7;
 ### Built-in Functions
 
 `print(arg1, arg2, ...)`
+
 `len("string") == 6`
+
 `len(["a", "b"]) == 2`
+
 `first([1, 2, 3]) == 1`
+
 `rest([1, 2, 3]) == [1, 2, 3]`
+
 `last([1, 2, 3]) == 3`
+
 `push([1, 2], 3) == [1, 2, 3]`
 
 ## Getting started
