@@ -45,6 +45,16 @@ let j = while (i < 2) {
 }
 ```
 
+### For loops
+
+```monkey
+let sum = 0;
+for (let i = 0; i < 11; let i = i + 1) {
+    let sum = sum + i;
+}
+sum == 55
+```
+
 ### Functions and closures
 
 ```monkey

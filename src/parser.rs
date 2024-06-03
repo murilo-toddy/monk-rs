@@ -218,6 +218,7 @@ impl<'a> Parser<'a> {
             Token::Lbrace => self.parse_hash_literal(),
             Token::If => self.parse_if_expression(),
             Token::While => self.parse_while_expression(),
+            Token::For => self.parse_for_expression(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::Identifier(_) => self.parse_identifier(),
             Token::Integer(_) => self.parse_integer_literal(),
@@ -323,7 +324,7 @@ impl<'a> Parser<'a> {
             return None;
         }
         self.next();
-        let condition = self.parse_expression(Precedence::Lowest);
+        let condition = self.parse_expression(Precedence::Lowest)?;
         if !self.expect_peek(&Token::Rparen) {
             return None;
         }
@@ -332,7 +333,40 @@ impl<'a> Parser<'a> {
         }
         Some(Expression::While {
             token: current_token,
-            condition: Box::new(condition.unwrap()),
+            condition: Box::new(condition),
+            statement: self.parse_block_statement(),
+        })
+    }
+
+    fn parse_for_expression(&mut self) -> Option<Expression> {
+        let current_token = self.current_token.clone();
+        if !self.expect_peek(&Token::Lparen) {
+            return None;
+        }
+        self.next();
+
+        let declaration = self.parse_statement()?;
+        self.next();
+
+        let condition = self.parse_expression(Precedence::Lowest)?;
+        if !self.expect_peek(&Token::Semicolon) {
+            return None;
+        }
+        self.next();
+
+        let operation = self.parse_statement()?;
+        if !self.expect_peek(&Token::Rparen) {
+            return None;
+        }
+        if !self.expect_peek(&Token::Lbrace) {
+            return None;
+        }
+        
+        Some(Expression::For {
+            token: current_token,
+            declaration: Box::from(declaration),
+            condition: Box::from(condition),
+            operation: Box::from(operation),
             statement: self.parse_block_statement(),
         })
     }
@@ -803,6 +837,61 @@ mod parser_tests {
                         operator: "<".to_owned(),
                         left: Box::new(identifier("x")),
                         right: Box::new(identifier("y")),
+                    }),
+                    statement: BlockStatement {
+                        token: Token::Lbrace,
+                        statements: vec![
+                            Statement::Expression {
+                                token: Token::Identifier("x".to_owned()), 
+                                expression: Some(identifier("x")),
+                            },
+                        ],
+                    },
+                })
+            }]),
+            program
+        );
+    }
+
+    #[test]
+    fn test_for_statement() {
+        let input = "for (let i = 0; i < x; let i = i + 1) { x }".as_bytes();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        check_parse_errors(parser);
+
+        assert_eq!(
+            Program(vec![Statement::Expression {
+                token: Token::For,
+                expression: Some(Expression::For {
+                    token: Token::For,
+                    declaration: Box::new(Statement::Let {
+                        token: Token::Let,
+                        name: Identifier {
+                            token: Token::Identifier("i".to_string()),
+                            value: "i".to_string(),
+                        },
+                        value: Some(integer(0)),
+                    }),
+                    condition: Box::new(Expression::Infix {
+                        token: Token::Lt,
+                        operator: "<".to_owned(),
+                        left: Box::new(identifier("i")),
+                        right: Box::new(identifier("x")),
+                    }),
+                    operation: Box::new(Statement::Let {
+                        token: Token::Let,
+                        name: Identifier {
+                            token: Token::Identifier("i".to_string()),
+                            value: "i".to_string(),
+                        },
+                        value: Some(Expression::Infix {
+                            token: Token::Plus,
+                            operator: "+".to_owned(),
+                            left: Box::new(identifier("i")),
+                            right: Box::new(integer(1)),
+                        }),
                     }),
                     statement: BlockStatement {
                         token: Token::Lbrace,

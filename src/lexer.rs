@@ -161,6 +161,9 @@ return false;
 while (x < 10) {
 x + 1
 }
+for (let i = 0; i < 2; let i = i + 1) {
+y = i;
+}
 ".as_bytes();
 
         let tests = vec![
@@ -261,6 +264,30 @@ x + 1
             Token::Identifier("x".to_string()),
             Token::Plus,
             Token::Integer(1),
+            Token::Rbrace,
+            Token::For,
+            Token::Lparen,
+            Token::Let,
+            Token::Identifier("i".to_string()),
+            Token::Assign,
+            Token::Integer(0),
+            Token::Semicolon,
+            Token::Identifier("i".to_string()),
+            Token::Lt,
+            Token::Integer(2),
+            Token::Semicolon,
+            Token::Let,
+            Token::Identifier("i".to_string()),
+            Token::Assign,
+            Token::Identifier("i".to_string()),
+            Token::Plus,
+            Token::Integer(1),
+            Token::Rparen,
+            Token::Lbrace,
+            Token::Identifier("y".to_string()),
+            Token::Assign,
+            Token::Identifier("i".to_string()),
+            Token::Semicolon,
             Token::Rbrace,
             Token::Eof,
         ];

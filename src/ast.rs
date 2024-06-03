@@ -64,6 +64,13 @@ pub enum Expression {
         condition: Box<Expression>,
         statement: BlockStatement,
     },
+    For {
+        token: Token,
+        declaration: Box<Statement>,
+        condition: Box<Expression>,
+        operation: Box<Statement>,
+        statement: BlockStatement,
+    },
     Function {
         token: Token,
         arguments: Vec<Identifier>,
@@ -166,7 +173,10 @@ impl std::fmt::Display for Expression {
                 Ok(())
             },
             Expression::While { condition, statement, .. } => {
-                write!(f, "if {} {}", condition, statement)
+                write!(f, "while ({}) {}", condition, statement)
+            },
+            Expression::For { declaration, condition, operation, statement, .. } => {
+                write!(f, "for ({}; {}; {}) {}", declaration, condition, operation, statement)
             },
             Expression::Function { arguments, body, .. } => {
                 write!(f, "fn(")?;

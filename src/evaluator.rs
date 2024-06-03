@@ -148,6 +148,30 @@ impl Evaluator {
         result.unwrap_or(Object::Null)
     }
 
+    fn evaluate_for_expression(
+        &mut self,
+        declaration: Statement,
+        condition: Expression,
+        operation: Statement,
+        block_statement: BlockStatement
+    ) -> Object {
+        let mut result = None;
+        self.evaluate_statement(declaration);
+        loop {
+            let condition_eval = self.evaluate_expression(condition.clone());
+            if self.is_error(&condition_eval) {
+                return condition_eval;
+            }
+            if !self.is_truthy(&condition_eval) {
+                break
+            }
+            result = Some(self.evaluate_block_statement(block_statement.clone()));
+            self.evaluate_statement(operation.clone());
+        }
+        
+        result.unwrap_or(Object::Null)
+    }
+
     fn evaluate_expressions(&mut self, expressions: Vec<Expression>) -> Vec<Object> {
         let mut result = vec![];
         for expression in expressions {
@@ -214,8 +238,11 @@ impl Evaluator {
             Expression::Function { arguments, body, .. } => {
                 Object::Function(arguments, body, self.env.clone())
             },
-            Expression::While { condition, statement: consequence, .. } => {
-                self.evaluate_while_expression(*condition, consequence)
+            Expression::While { condition, statement, .. } => {
+                self.evaluate_while_expression(*condition, statement)
+            },
+            Expression::For { declaration, condition, operation, statement, .. } => {
+                self.evaluate_for_expression(*declaration, *condition, *operation, statement)
             },
             Expression::Call { function, arguments, .. } => {
                 let func = self.evaluate_expression(*function);
@@ -447,6 +474,20 @@ mod evaluator_tests {
         let tests = vec![
             ("let i = 0; while (i < 2) { let i = i + 1; }", Object::Integer(2)),
             ("let i = 0; while (i < 25) { let i = i + 10; }", Object::Integer(30)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_for_expression_eval() {
+        let tests = vec![
+            ("let x = 0; for (let i = 0; i < 11; let i = i + 1) { let x = x + i; }; x;", Object::Integer(55)),
+            ("for (let i = 0; i < 11; let i = i + 1) { i; };", Object::Integer(10)),
+            ("for (let i = 10; i < 0; let i = i + 1) { i; };", Object::Null),
         ];
 
         for (input, expected) in tests {
