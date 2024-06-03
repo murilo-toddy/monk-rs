@@ -73,6 +73,12 @@ impl Evaluator {
                     "/" => Object::Integer(left_val / right_val),
                     "==" => Object::Boolean(left_val == right_val),
                     "!=" => Object::Boolean(left_val != right_val),
+                    "&" => Object::Integer(left_val & right_val),
+                    "|" => Object::Integer(left_val | right_val),
+                    "&&" => Object::Boolean(*left_val != 0 && *right_val != 0),
+                    "||" => Object::Boolean(*left_val != 0 || *right_val != 0),
+                    ">=" => Object::Boolean(left_val >= right_val),
+                    "<=" => Object::Boolean(left_val <= right_val),
                     ">" => Object::Boolean(left_val > right_val),
                     "<" => Object::Boolean(left_val < right_val),
                     _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
@@ -82,12 +88,16 @@ impl Evaluator {
                 match operator.as_str() {
                     "==" => Object::Boolean(left_val == right_val),
                     "!=" => Object::Boolean(left_val != right_val),
+                    "&&" => Object::Boolean(*left_val && *right_val),
+                    "||" => Object::Boolean(*left_val || *right_val),
                     _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
                 }
             }
             (Object::String(left_val), Object::String(right_val)) => {
                 match operator.as_str() {
                     "+" => Object::String(left_val.to_owned() + right_val),
+                    "==" => Object::Boolean(left_val == right_val),
+                    "!=" => Object::Boolean(left_val != right_val),
                     _ => Object::Error(format!("unknown operation: string {} string", operator))
                 }
             }
@@ -369,6 +379,8 @@ mod evaluator_tests {
             ("5 - 5", Object::Integer(0)),
             ("5 * 5", Object::Integer(25)),
             ("5 / 5", Object::Integer(1)),
+            ("3 & 1", Object::Integer(1)),
+            ("2 | 1", Object::Integer(3)),
             ("5 + 5 + 5 + 5 - 10", Object::Integer(10)),
             ("2 * 2 * 2 * 2 * 2", Object::Integer(32)),
             ("-50 + 100 + -50", Object::Integer(0)),
@@ -393,6 +405,10 @@ mod evaluator_tests {
         let tests = vec![
             ("\"Hello World!\"", Object::String("Hello World!".to_string())),
             ("\"Hello\" + \" \" + \"World!\"", Object::String("Hello World!".to_string())),
+            ("\"a\" == \"a\"", Object::Boolean(true)),
+            ("\"a\" == \"aa\"", Object::Boolean(false)),
+            ("\"a\" == \"b\"", Object::Boolean(false)),
+            ("\"a\" != \"b\"", Object::Boolean(true)),
         ];
 
         for (input, expected) in tests {
@@ -412,13 +428,19 @@ mod evaluator_tests {
             ("true != false", Object::Boolean(true)),
             ("false != true", Object::Boolean(true)),
             ("(1 < 2) == true", Object::Boolean(true)),
+            ("(1 >= 1) || false", Object::Boolean(true)),
+            ("(1 >= 1) && false", Object::Boolean(false)),
             ("(1 < 2) == false", Object::Boolean(false)),
             ("(1 > 2) == true", Object::Boolean(false)),
             ("(1 > 2) == false", Object::Boolean(true)),
             ("1 < 2", Object::Boolean(true)),
+            ("1 <= 2", Object::Boolean(true)),
             ("1 > 2", Object::Boolean(false)),
+            ("1 >= 2", Object::Boolean(false)),
             ("1 < 1", Object::Boolean(false)),
+            ("1 <= 1", Object::Boolean(true)),
             ("1 > 1", Object::Boolean(false)),
+            ("1 >= 1", Object::Boolean(true)),
             ("1 == 1", Object::Boolean(true)),
             ("1 != 1", Object::Boolean(false)),
             ("1 == 2", Object::Boolean(false)),
@@ -722,4 +744,3 @@ mod evaluator_tests {
         }
     }
 }
-

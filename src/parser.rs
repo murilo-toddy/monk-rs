@@ -80,7 +80,11 @@ impl<'a> Parser<'a> {
             Token::Lparen => Precedence::Call,
             Token::Asterisk | Token::Slash => Precedence::Product,
             Token::Plus | Token::Minus => Precedence::Sum,
-            Token::Gt | Token::Lt => Precedence::LessGreater,
+            Token::Gt | Token::Lt | Token::Gte | Token::Lte => Precedence::LessGreater,
+            Token::Or => Precedence::Or,
+            Token::And => Precedence::And,
+            Token::BitOr => Precedence::BitOr,
+            Token::BitAnd => Precedence::BitAnd,
             Token::Eq | Token::Neq => Precedence::Equals,
             _ => Precedence::Lowest
         }
@@ -242,8 +246,14 @@ impl<'a> Parser<'a> {
                 | Token::Asterisk
                 | Token::Eq
                 | Token::Neq
+                | Token::And
+                | Token::Or
+                | Token::BitAnd
+                | Token::BitOr
                 | Token::Lt
-                | Token::Gt => {
+                | Token::Lte
+                | Token::Gt
+                | Token::Gte => {
                     self.next();
                     self.parse_infix_expression(left_expression?)
                 },
@@ -770,9 +780,15 @@ mod parser_tests {
             ("5 * 5;", Program(vec![infix_template(5, "*", Token::Asterisk, 5)])),
             ("5 / 5;", Program(vec![infix_template(5, "/", Token::Slash, 5)])),
             ("5 > 5;", Program(vec![infix_template(5, ">", Token::Gt, 5)])),
+            ("5 >= 5;", Program(vec![infix_template(5, ">=", Token::Gte, 5)])),
             ("5 < 5;", Program(vec![infix_template(5, "<", Token::Lt, 5)])),
+            ("5 <= 5;", Program(vec![infix_template(5, "<=", Token::Lte, 5)])),
             ("5 == 5;", Program(vec![infix_template(5, "==", Token::Eq, 5)])),
             ("5 != 5;", Program(vec![infix_template(5, "!=", Token::Neq, 5)])),
+            ("5 & 5;", Program(vec![infix_template(5, "&", Token::BitAnd, 5)])),
+            ("5 && 5;", Program(vec![infix_template(5, "&&", Token::And, 5)])),
+            ("5 | 5;", Program(vec![infix_template(5, "|", Token::BitOr, 5)])),
+            ("5 || 5;", Program(vec![infix_template(5, "||", Token::Or, 5)])),
         ]; 
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
@@ -1045,6 +1061,11 @@ mod parser_tests {
             ("true", "true"),
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 >= 5 == false", "((3 >= 5) == false)"),
+            ("3 > 5 && false == true", "((3 > 5) && (false == true))"),
+            ("a || b && c", "(a || (b && c))"),
+            ("a != b && c", "((a != b) && c)"),
+            ("a | b && c || d & e", "(((a | b) && c) || (d & e))"),
             ("3 < 5 == true", "((3 < 5) == true)"),
             ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
             ("(5 + 5) * 2", "((5 + 5) * 2)"),

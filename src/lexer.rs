@@ -92,12 +92,14 @@ impl<'a> Lexer<'a> {
             '\0' => Token::Eof,
             '=' => self.compare_peek('=', Token::Eq, Token::Assign),
             '!' => self.compare_peek('=', Token::Neq, Token::Bang),
+            '&' => self.compare_peek('&', Token::And, Token::BitAnd),
+            '|' => self.compare_peek('|', Token::Or, Token::BitOr),
+            '>' => self.compare_peek('=', Token::Gte, Token::Gt),
+            '<' => self.compare_peek('=', Token::Lte, Token::Lt),
             '+' => Token::Plus,
             '-' => Token::Minus,
             '*' => Token::Asterisk,
             '/' => Token::Slash,
-            '>' => Token::Gt,
-            '<' => Token::Lt,
             ':' => Token::Colon,
             ';' => Token::Semicolon,
             '(' => Token::Lparen,
@@ -164,6 +166,9 @@ x + 1
 for (let i = 0; i < 2; let i = i + 1) {
 y = i;
 }
+x && y || x & y && x | y
+x <= y
+x >= y
 ".as_bytes();
 
         let tests = vec![
@@ -289,6 +294,23 @@ y = i;
             Token::Identifier("i".to_string()),
             Token::Semicolon,
             Token::Rbrace,
+            Token::Identifier("x".to_string()),
+            Token::And,
+            Token::Identifier("y".to_string()),
+            Token::Or,
+            Token::Identifier("x".to_string()),
+            Token::BitAnd,
+            Token::Identifier("y".to_string()),
+            Token::And,
+            Token::Identifier("x".to_string()),
+            Token::BitOr,
+            Token::Identifier("y".to_string()),
+            Token::Identifier("x".to_string()),
+            Token::Lte,
+            Token::Identifier("y".to_string()),
+            Token::Identifier("x".to_string()),
+            Token::Gte,
+            Token::Identifier("y".to_string()),
             Token::Eof,
         ];
 

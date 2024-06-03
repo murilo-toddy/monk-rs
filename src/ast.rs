@@ -108,13 +108,17 @@ pub struct Program(pub Vec<Statement>);
 #[derive(PartialEq, PartialOrd, Debug)]
 pub enum Precedence {
     Lowest = 1,
-    Equals = 2,      // ==
-    LessGreater = 3, // > or <
-    Sum = 4,         // +
-    Product = 5,     // *
-    Prefix = 6,      // -x or !x
-    Call = 7,        // func(x)
-    Index = 8,       // arr[i]
+    Or = 2,          // ||
+    And = 3,         // &&
+    BitOr = 4,       // |
+    BitAnd = 5,      // &
+    Equals = 6,      // ==
+    LessGreater = 7, // > or <
+    Sum = 8,         // +
+    Product = 9,     // *
+    Prefix = 10,     // -x or !x
+    Call = 11,       // func(x)
+    Index = 12,      // arr[i]
 }
 
 

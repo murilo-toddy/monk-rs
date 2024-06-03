@@ -17,9 +17,21 @@ pub enum Token {
     Asterisk,
     Slash,
 
-    Gt,
-    Lt,
+    Eq,
+    Neq,
 
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+
+    And,
+    Or,
+
+    BitAnd,
+    BitOr,
+
+    // Separators
     Comma,
     Colon,
     Semicolon,
@@ -41,9 +53,6 @@ pub enum Token {
     Return,
     True,
     False,
-
-    Eq,
-    Neq,
 }
 
 impl Token {
@@ -77,8 +86,16 @@ impl std::fmt::Display for Token {
             Token::Bang => write!(f, "!"),
             Token::Asterisk => write!(f, "*"),
             Token::Slash => write!(f, "/"),
+            Token::Eq => write!(f, "=="),
+            Token::Neq => write!(f, "!="),
             Token::Gt => write!(f, ">"),
+            Token::Gte => write!(f, ">="),
             Token::Lt => write!(f, "<"),
+            Token::Lte => write!(f, "<="),
+            Token::And => write!(f, "&&"),
+            Token::Or => write!(f, "||"),
+            Token::BitAnd => write!(f, "&"),
+            Token::BitOr => write!(f, "|"),
             Token::Comma => write!(f, ","),
             Token::Colon => write!(f, ":"),
             Token::Semicolon => write!(f, ";"),
@@ -97,8 +114,6 @@ impl std::fmt::Display for Token {
             Token::Return => write!(f, "return"),
             Token::True => write!(f, "true"),
             Token::False => write!(f, "false"),
-            Token::Eq => write!(f, "=="),
-            Token::Neq => write!(f, "!="),
         }
     }
 }

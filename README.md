@@ -9,7 +9,7 @@ by Thorsten Ball.
 
 ### Integer, boolean, string, array and hash data types
 
-```monkey
+```
 let age = 1;
 let isTrue = true;
 let name = "Monkey";
@@ -19,16 +19,35 @@ let hash = {"one": 1, "two": 2};
 
 ### Basic operations 
 
-```monkey
+```
 let result = 1 + 2 * 3 / 4 - 5;
 let isTrue = 1 < 2;
 let isFalse = !isTrue;
 "Hello" + " " + "World";
 ```
 
-### Logic expressions
+### Logical operations
 
-```monkey
+```
+1 == 1 == true
+1 != 2 == true
+12 || -1 == true
+1 && 0 == false
+true && true == true
+true && false == false
+true || false == true
+```
+
+### Bitwise operations
+
+```
+1 & 3 == 1
+1 | 2 == 3
+```
+
+### Conditionals
+
+```
 let x = if (10 > 5) {
     true;
 } else {
@@ -38,7 +57,7 @@ let x = if (10 > 5) {
 
 ### While loops
 
-```monkey
+```
 let i = 0;
 let j = while (i < 2) {
     let i = i + 1;
@@ -47,7 +66,7 @@ let j = while (i < 2) {
 
 ### For loops
 
-```monkey
+```
 let sum = 0;
 for (let i = 0; i < 11; let i = i + 1) {
     let sum = sum + i;
@@ -57,7 +76,7 @@ sum == 55
 
 ### Functions and closures
 
-```monkey
+```
 let adder = fn(x) {
     fn (y) {
         return x + y;
