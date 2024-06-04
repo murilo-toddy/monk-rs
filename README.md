@@ -67,7 +67,7 @@ let x = if (10 > 5) {
 ```
 let i = 0;
 let j = while (i < 2) {
-    let i = i + 1;
+    i = i + 1;
 }
 ```
 
@@ -75,7 +75,7 @@ let j = while (i < 2) {
 
 ```
 let sum = 0;
-for (let i = 0; i < 11; let i = i + 1) {
+for (let i = 0; i < 11; i = i + 1) {
     let sum = sum + i;
 }
 sum == 55

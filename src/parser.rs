@@ -88,6 +88,7 @@ impl<'a> Parser<'a> {
             Token::BitXor => Precedence::BitXor,
             Token::BitShiftLeft | Token::BitShiftRight => Precedence::BitShift,
             Token::Eq | Token::Neq => Precedence::Equals,
+            Token::Assign => Precedence::Assign,
             _ => Precedence::Lowest
         }
     }
@@ -216,6 +217,26 @@ impl<'a> Parser<'a> {
         Some(Expression::Index { token, left: Box::new(left), index: Box::new(index) })
     }
 
+    fn parse_reassign_expression(&mut self, left: Expression) -> Option<Expression> {
+        let token = self.current_token.clone();
+        self.next();
+        match &left {
+            Expression::Identifier { .. } | Expression::Index { .. } => {
+                let right = self.parse_expression(Precedence::Lowest)?;
+                Some(Expression::Infix {
+                    token,
+                    operator: "=".to_string(),
+                    left: Box::from(left),
+                    right: Box::from(right),
+                })
+            },
+            _ => {
+                self.push_parse_error("left value of = is not identifier");
+                None
+            }
+        }
+    }
+
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
         // prefix expressions
         let mut left_expression = match &self.current_token {
@@ -269,6 +290,10 @@ impl<'a> Parser<'a> {
                 Token::Lbracket => {
                     self.next();
                     self.parse_index_expression(left_expression?)
+                },
+                Token::Assign => {
+                    self.next();
+                    self.parse_reassign_expression(left_expression?)
                 },
                 _ => {
                     return left_expression;
@@ -369,7 +394,7 @@ impl<'a> Parser<'a> {
         }
         self.next();
 
-        let operation = self.parse_statement()?;
+        let operation = self.parse_expression(Precedence::Lowest)?;
         if !self.expect_peek(&Token::Rparen) {
             return None;
         }
@@ -596,6 +621,14 @@ mod parser_tests {
         }
     }
 
+    fn index(value: Expression, index: Expression) -> Expression {
+        Expression::Index {
+            token: Token::Lbracket,
+            left: Box::from(value),
+            index: Box::from(index),
+        }
+    }
+
     #[test]
     fn test_let_statements() {
         let input = "let x = 5;
@@ -765,7 +798,29 @@ mod parser_tests {
         }
     }
 
-    fn infix_template(left: i64, op: &str, op_token: Token, right: i64) -> Statement {
+    fn token_from_expression(expr: &Expression) -> Token {
+        match expr {
+            Expression::Identifier { value, .. } => Token::Identifier(value.to_string()),
+            Expression::Integer { value, .. } => Token::Integer(value.to_owned()),
+            Expression::Index { left, .. } => token_from_expression(left),
+            _ => Token::Illegal('1'),
+        }
+    }
+
+    fn infix_template(left: Expression, op: &str, op_token: Token, right: Expression) -> Statement {
+        let token = token_from_expression(&left);
+        Statement::Expression {
+            token,
+            expression: Some(Expression::Infix {
+                token: op_token,
+                operator: op.to_owned(),
+                left: Box::new(left),
+                right: Box::new(right),
+            })
+        }
+    }
+
+    fn int_infix_template(left: i64, op: &str, op_token: Token, right: i64) -> Statement {
         Statement::Expression {
             token: Token::Integer(left),
             expression: Some(Expression::Infix {
@@ -780,23 +835,25 @@ mod parser_tests {
     #[test]
     fn test_infix_expression() {
         let tests = vec![
-            ("5 + 5;", Program(vec![infix_template(5, "+", Token::Plus, 5)])),
-            ("5 - 5;", Program(vec![infix_template(5, "-", Token::Minus, 5)])),
-            ("5 * 5;", Program(vec![infix_template(5, "*", Token::Asterisk, 5)])),
-            ("5 / 5;", Program(vec![infix_template(5, "/", Token::Slash, 5)])),
-            ("5 > 5;", Program(vec![infix_template(5, ">", Token::Gt, 5)])),
-            ("5 >= 5;", Program(vec![infix_template(5, ">=", Token::Gte, 5)])),
-            ("5 < 5;", Program(vec![infix_template(5, "<", Token::Lt, 5)])),
-            ("5 <= 5;", Program(vec![infix_template(5, "<=", Token::Lte, 5)])),
-            ("5 == 5;", Program(vec![infix_template(5, "==", Token::Eq, 5)])),
-            ("5 != 5;", Program(vec![infix_template(5, "!=", Token::Neq, 5)])),
-            ("5 & 5;", Program(vec![infix_template(5, "&", Token::BitAnd, 5)])),
-            ("5 && 5;", Program(vec![infix_template(5, "&&", Token::And, 5)])),
-            ("5 | 5;", Program(vec![infix_template(5, "|", Token::BitOr, 5)])),
-            ("5 || 5;", Program(vec![infix_template(5, "||", Token::Or, 5)])),
-            ("5 ^ 5;", Program(vec![infix_template(5, "^", Token::BitXor, 5)])),
-            ("5 << 5;", Program(vec![infix_template(5, "<<", Token::BitShiftLeft, 5)])),
-            ("5 >> 5;", Program(vec![infix_template(5, ">>", Token::BitShiftRight, 5)])),
+            ("5 + 5;", Program(vec![int_infix_template(5, "+", Token::Plus, 5)])),
+            ("5 - 5;", Program(vec![int_infix_template(5, "-", Token::Minus, 5)])),
+            ("5 * 5;", Program(vec![int_infix_template(5, "*", Token::Asterisk, 5)])),
+            ("5 / 5;", Program(vec![int_infix_template(5, "/", Token::Slash, 5)])),
+            ("5 > 5;", Program(vec![int_infix_template(5, ">", Token::Gt, 5)])),
+            ("5 >= 5;", Program(vec![int_infix_template(5, ">=", Token::Gte, 5)])),
+            ("5 < 5;", Program(vec![int_infix_template(5, "<", Token::Lt, 5)])),
+            ("5 <= 5;", Program(vec![int_infix_template(5, "<=", Token::Lte, 5)])),
+            ("5 == 5;", Program(vec![int_infix_template(5, "==", Token::Eq, 5)])),
+            ("5 != 5;", Program(vec![int_infix_template(5, "!=", Token::Neq, 5)])),
+            ("5 & 5;", Program(vec![int_infix_template(5, "&", Token::BitAnd, 5)])),
+            ("5 && 5;", Program(vec![int_infix_template(5, "&&", Token::And, 5)])),
+            ("5 | 5;", Program(vec![int_infix_template(5, "|", Token::BitOr, 5)])),
+            ("5 || 5;", Program(vec![int_infix_template(5, "||", Token::Or, 5)])),
+            ("5 ^ 5;", Program(vec![int_infix_template(5, "^", Token::BitXor, 5)])),
+            ("5 << 5;", Program(vec![int_infix_template(5, "<<", Token::BitShiftLeft, 5)])),
+            ("5 >> 5;", Program(vec![int_infix_template(5, ">>", Token::BitShiftRight, 5)])),
+            ("value = 5;", Program(vec![infix_template(identifier("value"), "=", Token::Assign, integer(5))])),
+            ("value[1] = 5;", Program(vec![infix_template(index(identifier("value"), integer(1)), "=", Token::Assign, integer(5))])),
         ]; 
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
@@ -879,7 +936,7 @@ mod parser_tests {
 
     #[test]
     fn test_for_statement() {
-        let input = "for (let i = 0; i < x; let i = i + 1) { x }".as_bytes();
+        let input = "for (let i = 0; i < x; i = i + 1) { x }".as_bytes();
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -904,13 +961,14 @@ mod parser_tests {
                         left: Box::new(identifier("i")),
                         right: Box::new(identifier("x")),
                     }),
-                    operation: Box::new(Statement::Let {
-                        token: Token::Let,
-                        name: Identifier {
+                    operation: Box::new(Expression::Infix {
+                        token: Token::Assign,
+                        operator: "=".to_owned(),
+                        left: Box::from(Expression::Identifier {
                             token: Token::Identifier("i".to_string()),
                             value: "i".to_string(),
-                        },
-                        value: Some(Expression::Infix {
+                        }),
+                        right: Box::from(Expression::Infix {
                             token: Token::Plus,
                             operator: "+".to_owned(),
                             left: Box::new(identifier("i")),

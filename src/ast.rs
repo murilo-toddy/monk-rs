@@ -46,7 +46,7 @@ pub enum Expression {
         operator: String,
         right: Box<Expression>,
     },
-    Infix {
+        Infix {
         token: Token,
         operator: String,
         left: Box<Expression>,
@@ -68,7 +68,7 @@ pub enum Expression {
         token: Token,
         declaration: Box<Statement>,
         condition: Box<Expression>,
-        operation: Box<Statement>,
+        operation: Box<Expression>,
         statement: BlockStatement,
     },
     Function {
@@ -108,19 +108,20 @@ pub struct Program(pub Vec<Statement>);
 #[derive(PartialEq, PartialOrd, Debug)]
 pub enum Precedence {
     Lowest = 1,
-    Or = 2,          // ||
-    And = 3,         // &&
-    BitOr = 4,       // |
-    BitXor = 5,      // ^
-    BitAnd = 6,      // &
-    Equals = 7,      // ==
-    LessGreater = 8, // > or <
-    BitShift = 9,    // >> or <<
-    Sum = 10,        // +
-    Product = 11,    // *
-    Prefix = 12,     // -x or !x
-    Call = 13,       // func(x)
-    Index = 14,      // arr[i]
+    Assign = 2,      // =
+    Or = 3,          // ||
+    And = 4,         // &&
+    BitOr = 5,       // |
+    BitXor = 6,      // ^
+    BitAnd = 7,      // &
+    Equals = 8,      // ==
+    LessGreater = 9, // > or <
+    BitShift = 10,   // >> or <<
+    Sum = 11,        // +
+    Product = 12,    // *
+    Prefix = 13,     // -x or !x
+    Call = 14,       // func(x)
+    Index = 15,      // arr[i]
 }
 
 

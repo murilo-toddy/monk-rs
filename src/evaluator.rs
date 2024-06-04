@@ -49,12 +49,70 @@ impl Evaluator {
         }
     }
 
+    fn evaluate_reassign_expression(&mut self, left: Expression, right: Expression) -> Object {
+        match left {
+            Expression::Identifier { value, .. } => {
+                let right_eval = self.evaluate_expression(right);
+                if self.is_error(&right_eval) {
+                    return right_eval;
+                }
+                if let Some(_) = self.env.get(&value) {
+                    self.env.set(value.to_owned(), right_eval.clone());
+                    return right_eval;
+                } else {
+                    return Object::Error(format!("identifier {} not found", value));
+                }
+            },
+            Expression::Index { left, index, .. } => {
+                if let Expression::Identifier { value, .. } = *left.clone() {
+                    let left_eval = self.evaluate_expression(*left);
+                    if self.is_error(&left_eval) {
+                        return left_eval;
+                    }
+                    let index_eval = self.evaluate_expression(*index);
+                    if self.is_error(&index_eval) {
+                        return index_eval;
+                    }
+
+                    let right_eval = self.evaluate_expression(right);
+                    if self.is_error(&right_eval) {
+                        return right_eval;
+                    }
+
+                    // TODO remove clone if possible
+                    match (left_eval.clone(), index_eval.clone()) {
+                        (Object::Array(mut arr), Object::Integer(idx)) => {
+                            if idx < 0 || idx as usize > arr.len() - 1 {
+                                return Object::Error(format!("index {} out of bounds for array {}", idx, left_eval.inspect()))
+                            }
+                            arr[idx as usize] = right_eval.clone();
+                            self.env.set(value, Object::Array(arr));
+                            return right_eval;
+                        },
+                        (Object::Hash(mut hash), _) => {
+                            hash.insert(index_eval, right_eval.clone()); 
+                            self.env.set(value, Object::Hash(hash));
+                            return right_eval;
+                        },
+                        _ => return Object::Error(format!("reassign not allowed")),
+                    }
+                } 
+            }
+            _ => {}
+        }
+        Object::Null
+    }
+        
     fn evaluate_infix_expression(
         &mut self,
         operator: String, 
         left: Expression,
         right: Expression,
     ) -> Object {
+        if operator.as_str() == "=" {
+            return self.evaluate_reassign_expression(left, right);
+        }
+
         let left_eval = self.evaluate_expression(left);
         if self.is_error(&left_eval) {
             return left_eval;
@@ -165,7 +223,7 @@ impl Evaluator {
         &mut self,
         declaration: Statement,
         condition: Expression,
-        operation: Statement,
+        operation: Expression,
         block_statement: BlockStatement
     ) -> Object {
         let mut result = None;
@@ -179,7 +237,7 @@ impl Evaluator {
                 break
             }
             result = Some(self.evaluate_block_statement(block_statement.clone()));
-            self.evaluate_statement(operation.clone());
+            self.evaluate_expression(operation.clone());
         }
         
         result.unwrap_or(Object::Null)
@@ -513,9 +571,9 @@ mod evaluator_tests {
     #[test]
     fn test_for_expression_eval() {
         let tests = vec![
-            ("let x = 0; for (let i = 0; i < 11; let i = i + 1) { let x = x + i; }; x;", Object::Integer(55)),
-            ("for (let i = 0; i < 11; let i = i + 1) { i; };", Object::Integer(10)),
-            ("for (let i = 10; i < 0; let i = i + 1) { i; };", Object::Null),
+            ("let x = 0; for (let i = 0; i < 11; i = i + 1) { let x = x + i; }; x;", Object::Integer(55)),
+            ("for (let i = 0; i < 11; i = i + 1) { i; };", Object::Integer(10)),
+            ("for (let i = 10; i < 0; i = i + 1) { i; };", Object::Null),
         ];
 
         for (input, expected) in tests {
@@ -742,6 +800,46 @@ mod evaluator_tests {
             ("{5: 5}[5]", Object::Integer(5)),
             ("{true: 5}[true]", Object::Integer(5)),
             ("{false: 5}[false]", Object::Integer(5)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = eval_input(input);
+            assert_eq!(evaluated, expected, "{:?}", input);
+        }
+    }
+
+    #[test]
+    fn test_variable_reassignment() {
+        let tests = [
+            ("let i = 1; i = 2; i", Object::Integer(2)),
+            ("let i = 1; i = \"hello\"; i", Object::String("hello".to_owned())),
+            ("i = 1; i", Object::Error("identifier i not found".to_owned())),
+            (
+                "let arr = [0, 1, 2]; arr[0] = {}; arr", 
+                Object::Array(vec![
+                    Object::Hash(HashMap::new()),
+                    Object::Integer(1), Object::Integer(2)
+                ])
+            ),
+            (
+                "let arr = [0]; arr[0] = [1]; arr",
+                Object::Array(vec![
+                    Object::Array(vec![Object::Integer(1)])
+                ])
+            ),
+            (
+                "let hash = {1: 1, 2: 2}; hash[1] = 3; hash",
+                Object::Hash(HashMap::from([
+                    (Object::Integer(1), Object::Integer(3)),
+                    (Object::Integer(2), Object::Integer(2))
+                ]))
+            ),
+            (
+                "let hash = {}; hash[\"a\"] = \"b\"; hash",
+                Object::Hash(HashMap::from([
+                    (Object::String("a".to_owned()), Object::String("b".to_owned()))
+                ]))
+            ),
         ];
 
         for (input, expected) in tests {
