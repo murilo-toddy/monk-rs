@@ -322,14 +322,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_if_expression(&mut self) -> Option<Expression> {
-        let current_token = self.current_token.clone();
+    fn parse_if_branch(&mut self) -> Option<(Expression, BlockStatement)> {
         if !self.expect_peek(&Token::Lparen) {
             return None;
         }
-
         self.next();
-        let condition = self.parse_expression(Precedence::Lowest);
+        let condition = self.parse_expression(Precedence::Lowest)?;
 
         if !self.expect_peek(&Token::Rparen) {
             return None;
@@ -338,22 +336,32 @@ impl<'a> Parser<'a> {
             return None;
         }
         let consequence = self.parse_block_statement();
+        Some((condition, consequence))
+    }
+
+    fn parse_if_expression(&mut self) -> Option<Expression> {
+        let current_token = self.current_token.clone();
+        let mut conditions = vec![self.parse_if_branch()?];
 
         let mut alternative: Option<BlockStatement> = None;
-        // TODO add support for else if
-        if self.peek_token_is(&Token::Else) {
+        while self.peek_token_is(&Token::Else) {
             self.next();
-            if !self.expect_peek(&Token::Lbrace) {
-                return None;
+            if self.peek_token_is(&Token::If) {
+                self.next();
+                conditions.push(self.parse_if_branch()?);
             }
-
-            alternative = Some(self.parse_block_statement());
+            else {
+                if !self.expect_peek(&Token::Lbrace) {
+                    return None;
+                }
+                alternative = Some(self.parse_block_statement());
+                break;
+            }
         }
 
         Some(Expression::If {
             token: current_token,
-            condition: Box::new(condition.unwrap()),
-            consequence,
+            conditions,
             alternative,
         })
     }
@@ -878,21 +886,25 @@ mod parser_tests {
                 token: Token::If,
                 expression: Some(Expression::If {
                     token: Token::If,
-                    condition: Box::new(Expression::Infix {
-                        token: Token::Lt,
-                        operator: "<".to_owned(),
-                        left: Box::new(identifier("x")),
-                        right: Box::new(identifier("y")),
-                    }),
-                    consequence: BlockStatement {
-                        token: Token::Lbrace,
-                        statements: vec![
-                            Statement::Expression {
-                                token: Token::Identifier("x".to_owned()), 
-                                expression: Some(identifier("x")),
+                    conditions: vec![
+                        (
+                            Expression::Infix {
+                                token: Token::Lt,
+                                operator: "<".to_owned(),
+                                left: Box::new(identifier("x")),
+                                right: Box::new(identifier("y")),
                             },
-                        ],
-                    },
+                            BlockStatement {
+                                token: Token::Lbrace,
+                                statements: vec![
+                                    Statement::Expression {
+                                        token: Token::Identifier("x".to_owned()), 
+                                        expression: Some(identifier("x")),
+                                    },
+                                ],
+                            }
+                        )
+                    ],
                     alternative: None,
                 })
            }]),
@@ -992,7 +1004,7 @@ mod parser_tests {
  
     #[test]
     fn test_if_else_statement() {
-        let input = "if (x < y) { x } else { y }".as_bytes();
+        let input = "if (x < y) { x } else if (x > y) { y } else { z }".as_bytes();
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -1003,27 +1015,48 @@ mod parser_tests {
                 token: Token::If,
                 expression: Some(Expression::If {
                     token: Token::If,
-                    condition: Box::new(Expression::Infix {
-                        token: Token::Lt,
-                        operator: "<".to_owned(),
-                        left: Box::new(identifier("x")),
-                        right: Box::new(identifier("y")),
-                    }),
-                    consequence: BlockStatement {
-                        token: Token::Lbrace,
-                        statements: vec![
-                            Statement::Expression {
-                                token: Token::Identifier("x".to_owned()), 
-                                expression: Some(identifier("x")),
+                    conditions: vec![
+                        (
+                            Expression::Infix {
+                                token: Token::Lt,
+                                operator: "<".to_owned(),
+                                left: Box::new(identifier("x")),
+                                right: Box::new(identifier("y")),
                             },
-                        ],
-                    },
+                            BlockStatement {
+                                token: Token::Lbrace,
+                                statements: vec![
+                                    Statement::Expression {
+                                        token: Token::Identifier("x".to_owned()), 
+                                        expression: Some(identifier("x")),
+                                    },
+                                ],
+                            },
+                        ),
+                        (
+                            Expression::Infix {
+                                token: Token::Gt,
+                                operator: ">".to_owned(),
+                                left: Box::new(identifier("x")),
+                                right: Box::new(identifier("y")),
+                            },
+                            BlockStatement {
+                                token: Token::Lbrace,
+                                statements: vec![
+                                    Statement::Expression {
+                                        token: Token::Identifier("y".to_owned()), 
+                                        expression: Some(identifier("y")),
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
                     alternative: Some(BlockStatement {
                         token: Token::Lbrace,
                         statements: vec![
                             Statement::Expression {
-                                token: Token::Identifier("y".to_owned()), 
-                                expression: Some(identifier("y")),
+                                token: Token::Identifier("z".to_owned()), 
+                                expression: Some(identifier("z")),
                             },
                         ],
                     }),

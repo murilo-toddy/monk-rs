@@ -56,7 +56,7 @@ impl Evaluator {
                 if self.is_error(&right_eval) {
                     return right_eval;
                 }
-                if let Some(_) = self.env.get(&value) {
+                if self.env.get(&value).is_some() {
                     self.env.set(value.to_owned(), right_eval.clone());
                     return right_eval;
                 } else {
@@ -94,7 +94,8 @@ impl Evaluator {
                             self.env.set(value, Object::Hash(hash));
                             return right_eval;
                         },
-                        _ => return Object::Error(format!("reassign not allowed")),
+                        // TODO improve error message
+                        _ => return Object::Error("reassign not allowed".to_owned()),
                     }
                 } 
             }
@@ -188,20 +189,19 @@ impl Evaluator {
 
     fn evaluate_conditional_expression(
         &mut self,
-        condition: Expression, 
-        consequence: BlockStatement,
+        conditions: Vec<(Expression, BlockStatement)>,
         alternative: Option<BlockStatement>,
     ) -> Object {
-        let condition_eval = self.evaluate_expression(condition);
-        if self.is_error(&condition_eval) {
-            return condition_eval;
+        for (condition, consequence) in conditions {
+            let condition_eval = self.evaluate_expression(condition);
+            if self.is_error(&condition_eval) {
+                return condition_eval;
+            }
+            if self.is_truthy(&condition_eval) {
+                return self.evaluate_block_statement(consequence);
+            }
         }
-
-        if self.is_truthy(&condition_eval) {
-            self.evaluate_block_statement(consequence)
-        } else {
-            alternative.map_or(Object::Null, |a| self.evaluate_block_statement(a))
-        }
+        alternative.map_or(Object::Null, |a| self.evaluate_block_statement(a))
     }
 
     fn evaluate_while_expression(&mut self, condition: Expression, block_statement: BlockStatement) -> Object {
@@ -303,8 +303,8 @@ impl Evaluator {
             Expression::Infix { operator, left, right, .. } => {
                 self.evaluate_infix_expression(operator, *left, *right)
             },
-            Expression::If { condition, consequence, alternative, .. } => {
-                self.evaluate_conditional_expression(*condition, consequence, alternative)
+            Expression::If { conditions, alternative, .. } => {
+                self.evaluate_conditional_expression(conditions, alternative)
             },
             Expression::Function { arguments, body, .. } => {
                 Object::Function(arguments, body, self.env.clone())
@@ -547,11 +547,14 @@ mod evaluator_tests {
             ("if (1 < 2) { 10 }", Object::Integer(10)),
             ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
             ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
+            ("if (1 > 2) { 10 } else if (1 == 2) { 20 } else { 30 }", Object::Integer(30)),
+            ("if (1 > 2) { 10 } else if (1 < 2) { 20 } else { 30 }", Object::Integer(20)),
+            ("if (1 > 2) { 10 } else if (1 == 2) { 20 }", Object::Null),
         ];
 
         for (input, expected) in tests {
             let evaluated = eval_input(input);
-            assert_eq!(evaluated, expected);
+            assert_eq!(evaluated, expected, "{}", input);
         }
     }
 

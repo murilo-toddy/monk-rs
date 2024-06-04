@@ -55,10 +55,12 @@ true || false == true
 ### Conditionals
 
 ```
-let x = if (10 > 5) {
-    true;
+let x = if (10 < 5) {
+    10;
+} else if (10 > 5) {
+    5;
 } else {
-    false;
+    0;
 }
 ```
 

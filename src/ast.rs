@@ -46,17 +46,15 @@ pub enum Expression {
         operator: String,
         right: Box<Expression>,
     },
-        Infix {
+    Infix {
         token: Token,
         operator: String,
         left: Box<Expression>,
         right: Box<Expression>,
     },
-    // TODO add else if
     If {
         token: Token,
-        condition: Box<Expression>,
-        consequence: BlockStatement,
+        conditions: Vec<(Expression, BlockStatement)>,
         alternative: Option<BlockStatement>,
     },
     While {
@@ -172,8 +170,12 @@ impl std::fmt::Display for Expression {
             Expression::Infix { left, operator, right, .. } => {
                 write!(f, "({} {} {})", left, operator, right)
             },
-            Expression::If { condition, consequence, alternative, .. } => {
-                write!(f, "if {} {}", condition, consequence)?;
+            Expression::If { conditions, alternative, .. } => {
+                write!(f, "{}", conditions
+                    .iter()
+                    .map(|(condition, consequence)| format!("if {} {}", condition, consequence))
+                    .collect::<Vec<String>>()
+                    .join("else "))?;
                 if let Some(alt) = alternative {
                     write!(f, "else {}", alt)?;
                 }
