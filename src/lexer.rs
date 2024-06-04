@@ -78,24 +78,27 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn compare_peek(&mut self, ch: char, eq_token: Token, else_token: Token) -> Token {
-        if (self.peek_char() as char) == ch {
-            self.read_char();
-            return eq_token
+    fn compare_peek(&mut self, char_tokens: Vec<(char, Token)>, fallback: Token) -> Token {
+        for (ch, eq_token) in char_tokens {
+            if (self.peek_char() as char) == ch {
+                self.read_char();
+                return eq_token
+            }
         }
-        else_token
+        fallback
     }
 
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
         let token = match self.ch as char {
             '\0' => Token::Eof,
-            '=' => self.compare_peek('=', Token::Eq, Token::Assign),
-            '!' => self.compare_peek('=', Token::Neq, Token::Bang),
-            '&' => self.compare_peek('&', Token::And, Token::BitAnd),
-            '|' => self.compare_peek('|', Token::Or, Token::BitOr),
-            '>' => self.compare_peek('=', Token::Gte, Token::Gt),
-            '<' => self.compare_peek('=', Token::Lte, Token::Lt),
+            '=' => self.compare_peek(vec![('=', Token::Eq)], Token::Assign),
+            '!' => self.compare_peek(vec![('=', Token::Neq)], Token::Bang),
+            '&' => self.compare_peek(vec![('&', Token::And)], Token::BitAnd),
+            '|' => self.compare_peek(vec![('|', Token::Or)], Token::BitOr),
+            '>' => self.compare_peek(vec![('>', Token::BitShiftRight), ('=', Token::Gte)], Token::Gt),
+            '<' => self.compare_peek(vec![('<', Token::BitShiftLeft), ('=', Token::Lte)], Token::Lt),
+            '^' => Token::BitXor,
             '+' => Token::Plus,
             '-' => Token::Minus,
             '*' => Token::Asterisk,
@@ -169,6 +172,9 @@ y = i;
 x && y || x & y && x | y
 x <= y
 x >= y
+x ^ y
+x << y
+x >> y
 ".as_bytes();
 
         let tests = vec![
@@ -310,6 +316,15 @@ x >= y
             Token::Identifier("y".to_string()),
             Token::Identifier("x".to_string()),
             Token::Gte,
+            Token::Identifier("y".to_string()),
+            Token::Identifier("x".to_string()),
+            Token::BitXor,
+            Token::Identifier("y".to_string()),
+            Token::Identifier("x".to_string()),
+            Token::BitShiftLeft,
+            Token::Identifier("y".to_string()),
+            Token::Identifier("x".to_string()),
+            Token::BitShiftRight,
             Token::Identifier("y".to_string()),
             Token::Eof,
         ];

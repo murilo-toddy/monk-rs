@@ -17,6 +17,8 @@ pub enum Token {
     Asterisk,
     Slash,
 
+
+    // Logical operations
     Eq,
     Neq,
 
@@ -28,8 +30,12 @@ pub enum Token {
     And,
     Or,
 
+    // Bitwise operations
     BitAnd,
     BitOr,
+    BitXor,
+    BitShiftLeft,
+    BitShiftRight,
 
     // Separators
     Comma,
@@ -96,6 +102,9 @@ impl std::fmt::Display for Token {
             Token::Or => write!(f, "||"),
             Token::BitAnd => write!(f, "&"),
             Token::BitOr => write!(f, "|"),
+            Token::BitXor => write!(f, "^"),
+            Token::BitShiftLeft => write!(f, "<<"),
+            Token::BitShiftRight => write!(f, ">>"),
             Token::Comma => write!(f, ","),
             Token::Colon => write!(f, ":"),
             Token::Semicolon => write!(f, ";"),

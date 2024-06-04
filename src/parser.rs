@@ -85,6 +85,8 @@ impl<'a> Parser<'a> {
             Token::And => Precedence::And,
             Token::BitOr => Precedence::BitOr,
             Token::BitAnd => Precedence::BitAnd,
+            Token::BitXor => Precedence::BitXor,
+            Token::BitShiftLeft | Token::BitShiftRight => Precedence::BitShift,
             Token::Eq | Token::Neq => Precedence::Equals,
             _ => Precedence::Lowest
         }
@@ -250,6 +252,9 @@ impl<'a> Parser<'a> {
                 | Token::Or
                 | Token::BitAnd
                 | Token::BitOr
+                | Token::BitXor
+                | Token::BitShiftLeft
+                | Token::BitShiftRight
                 | Token::Lt
                 | Token::Lte
                 | Token::Gt
@@ -789,6 +794,9 @@ mod parser_tests {
             ("5 && 5;", Program(vec![infix_template(5, "&&", Token::And, 5)])),
             ("5 | 5;", Program(vec![infix_template(5, "|", Token::BitOr, 5)])),
             ("5 || 5;", Program(vec![infix_template(5, "||", Token::Or, 5)])),
+            ("5 ^ 5;", Program(vec![infix_template(5, "^", Token::BitXor, 5)])),
+            ("5 << 5;", Program(vec![infix_template(5, "<<", Token::BitShiftLeft, 5)])),
+            ("5 >> 5;", Program(vec![infix_template(5, ">>", Token::BitShiftRight, 5)])),
         ]; 
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());

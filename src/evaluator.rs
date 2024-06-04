@@ -75,6 +75,9 @@ impl Evaluator {
                     "!=" => Object::Boolean(left_val != right_val),
                     "&" => Object::Integer(left_val & right_val),
                     "|" => Object::Integer(left_val | right_val),
+                    "^" => Object::Integer(left_val ^ right_val),
+                    "<<" => Object::Integer(left_val << right_val),
+                    ">>" => Object::Integer(left_val >> right_val),
                     "&&" => Object::Boolean(*left_val != 0 && *right_val != 0),
                     "||" => Object::Boolean(*left_val != 0 || *right_val != 0),
                     ">=" => Object::Boolean(left_val >= right_val),
@@ -381,6 +384,9 @@ mod evaluator_tests {
             ("5 / 5", Object::Integer(1)),
             ("3 & 1", Object::Integer(1)),
             ("2 | 1", Object::Integer(3)),
+            ("3 ^ 5", Object::Integer(6)),
+            ("3 << 1", Object::Integer(6)),
+            ("2 >> 1", Object::Integer(1)),
             ("5 + 5 + 5 + 5 - 10", Object::Integer(10)),
             ("2 * 2 * 2 * 2 * 2", Object::Integer(32)),
             ("-50 + 100 + -50", Object::Integer(0)),
@@ -396,7 +402,7 @@ mod evaluator_tests {
 
         for (input, expected) in tests {
             let evaluated = eval_input(input);
-            assert_eq!(evaluated, expected);
+            assert_eq!(evaluated, expected, "{}", input);
         }
     }
 

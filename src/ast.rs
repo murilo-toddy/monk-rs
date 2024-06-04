@@ -111,14 +111,16 @@ pub enum Precedence {
     Or = 2,          // ||
     And = 3,         // &&
     BitOr = 4,       // |
-    BitAnd = 5,      // &
-    Equals = 6,      // ==
-    LessGreater = 7, // > or <
-    Sum = 8,         // +
-    Product = 9,     // *
-    Prefix = 10,     // -x or !x
-    Call = 11,       // func(x)
-    Index = 12,      // arr[i]
+    BitXor = 5,      // ^
+    BitAnd = 6,      // &
+    Equals = 7,      // ==
+    LessGreater = 8, // > or <
+    BitShift = 9,    // >> or <<
+    Sum = 10,        // +
+    Product = 11,    // *
+    Prefix = 12,     // -x or !x
+    Call = 13,       // func(x)
+    Index = 14,      // arr[i]
 }
 
 
