@@ -5,6 +5,10 @@ An interpreter for the Monkey Language written in Rust.
 The language comes from the book [Writing An Interpreter In Go](https://interpreterbook.com/)
 by Thorsten Ball.
 
+This version contains more features than the original book and supports loops and bitwise 
+operations. Also, the language is proven to be turing complete.
+
+
 ## Language features
 
 ### Integer, boolean, string, array and hash data types
@@ -43,6 +47,9 @@ true || false == true
 ```
 1 & 3 == 1
 1 | 2 == 3
+1 ^ 3 == 2
+3 << 2 == 12
+4 >> 1 == 2
 ```
 
 ### Conditionals
@@ -109,5 +116,11 @@ addTwo(5) == 7;
 
 ```bash
 $ make repl
+```
+
+### Running examples
+
+```bash
+$ cargo run -- examples/<filename>.mk
 ```
 
