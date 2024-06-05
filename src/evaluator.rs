@@ -15,7 +15,6 @@ impl Evaluator {
         }
     }
 
-    // TODO handle errors in a more rusty way
     fn is_error(&self, object: &Object) -> bool {
         matches!(object, Object::Error(_))
     }
@@ -29,24 +28,24 @@ impl Evaluator {
         if self.is_error(&right_eval) {
             return right_eval;
         }
-        // TODO move the common error out
         match operator.as_str() {
             "!" => {
                 match right_eval {
-                    Object::Boolean(value) => Object::Boolean(!value),
-                    Object::Integer(value) => Object::Boolean(value == 0),
-                    Object::Null => Object::Boolean(true),
-                    _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
+                    Object::Boolean(value) => return Object::Boolean(!value),
+                    Object::Integer(value) => return Object::Boolean(value == 0),
+                    Object::Null => return Object::Boolean(true),
+                    _ => {}
                 }
             }
             "-" => {
                 match right_eval {
-                    Object::Integer(value) => Object::Integer(-value),
-                    _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
+                    Object::Integer(value) => return Object::Integer(-value),
+                    _ => {}
                 }
             }
-            _ => Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect())),
+            _ => {}
         }
+        Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect()))
     }
 
     fn evaluate_reassign_expression(&mut self, left: Expression, right: Expression) -> Object {
@@ -79,23 +78,25 @@ impl Evaluator {
                         return right_eval;
                     }
 
-                    // TODO remove clone if possible
-                    match (left_eval.clone(), index_eval.clone()) {
-                        (Object::Array(mut arr), Object::Integer(idx)) => {
-                            if idx < 0 || idx as usize > arr.len() - 1 {
-                                return Object::Error(format!("index {} out of bounds for array {}", idx, left_eval.inspect()))
+                    match left_eval {
+                        Object::Array(mut arr) => {
+                            if let Object::Integer(idx) = index_eval {
+                                if arr.len() == 0 || idx < 0 || idx > (arr.len() as i64) - 1 {
+                                    return Object::Error(format!("index {} out of bounds for array [{}]", 
+                                        idx, arr.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", ")));
+                                }
+                                arr[idx as usize] = right_eval.clone();
+                                self.env.set(value, Object::Array(arr.to_owned()).to_owned());
+                                return right_eval;
                             }
-                            arr[idx as usize] = right_eval.clone();
-                            self.env.set(value, Object::Array(arr));
-                            return right_eval;
+                            return Object::Error(format!("expected index to be integer but got {}", index_eval.inspect()));
                         },
-                        (Object::Hash(mut hash), _) => {
+                        Object::Hash(mut hash) => {
                             hash.insert(index_eval, right_eval.clone()); 
                             self.env.set(value, Object::Hash(hash));
                             return right_eval;
                         },
-                        // TODO improve error message
-                        _ => return Object::Error("reassign not allowed".to_owned()),
+                        _ => return Object::Error(format!("cannot reassign object {}", left_eval.inspect())),
                     }
                 } 
             }
@@ -256,19 +257,21 @@ impl Evaluator {
     }
 
     fn evaluate_index_expression(&mut self, left: Object, index: Object) -> Object {
-        // TODO remove clone if possible
-        match (left, index.clone()) {
-            (Object::Array(elements), Object::Integer(index)) => {
-                if index < 0 || index as usize > elements.len() - 1 {
-                    return Object::Null
+        match left {
+            Object::Array(elements) => {
+                if let Object::Integer(index) = index {
+                    if elements.len() == 0 || index < 0 || index > elements.len() as i64 - 1 {
+                        return Object::Null;
+                    }
+                    return elements[index as usize].clone();
                 }
-                elements[index as usize].clone()
             },
-            (Object::Hash(elements), _) => {
-                elements.get(&index).map(|v| v.to_owned()).unwrap_or(Object::Null)
-            }
-            _ => Object::Error("index operator not supported".to_owned())
+            Object::Hash(elements) => {
+                return elements.get(&index).map(|v| v.to_owned()).unwrap_or(Object::Null);
+            },
+            _ => {}
         }
+        Object::Error("index operator not supported".to_owned())
     }
 
     fn evaluate_hash_literal(&mut self, pairs: Vec<(Expression, Expression)>) -> Object {
@@ -383,7 +386,6 @@ impl Evaluator {
                 if self.is_error(&value_eval) {
                     return Some(value_eval);
                 }
-                // TODO remove this clone
                 self.env.set(name.value, value_eval.clone());
                 Some(value_eval)
             },

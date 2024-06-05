@@ -122,8 +122,6 @@ impl<'a> Parser<'a> {
 
     fn parse_let_statement(&mut self) -> Option<Statement> {
         let token = self.current_token.clone();
-
-        // TODO understand the need of this clone
         let identifier = match self.peek_token.clone() {
             Token::Identifier(value) => {
                 self.next();
@@ -515,8 +513,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_string_literal(&mut self) -> Option<Expression> {
-        // TODO why do i need this clone?
-        let value = match self.current_token.clone() {
+        let value = match &self.current_token {
             Token::String(value) => value,
             _ => {
                 self.push_parse_error(
@@ -527,7 +524,7 @@ impl<'a> Parser<'a> {
         };
         Some(Expression::String {
             token: self.current_token.clone(),
-            value,
+            value: value.to_owned(),
         })
     }
 
