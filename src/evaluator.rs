@@ -371,7 +371,6 @@ impl Evaluator {
         if let Object::Function(arguments, _, environment) = func {
             let mut env = Environment::new_enclosed(environment);
             for (i, arg) in arguments.iter().enumerate() {
-                // TODO remove clones
                 env.set(arg.value.clone(), args[i].clone());
             }
             return env;
@@ -733,7 +732,7 @@ mod evaluator_tests {
         let tests = [
             ("len(\"\")", Object::Integer(0)),
             ("len(\"four\")", Object::Integer(4)),
-            ("len(1)", Object::Error("argument to `len` not supported".to_owned())),
+            ("len(1)", Object::Error("argument 1 not supported by `len`".to_owned())),
             ("len(\"one\", \"two\")", Object::Error("wrong number of arguments on function `len`. got=2, want=1".to_owned())),
         ];
 
