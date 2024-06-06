@@ -103,6 +103,7 @@ impl<'a> Lexer<'a> {
             '-' => Token::Minus,
             '*' => Token::Asterisk,
             '/' => Token::Slash,
+            '%' => Token::Percentage,
             ':' => Token::Colon,
             ';' => Token::Semicolon,
             '(' => Token::Lparen,
@@ -175,6 +176,7 @@ x >= y
 x ^ y
 x << y
 x >> y
+x % y
 ".as_bytes();
 
         let tests = vec![
@@ -325,6 +327,9 @@ x >> y
             Token::Identifier("y".to_string()),
             Token::Identifier("x".to_string()),
             Token::BitShiftRight,
+            Token::Identifier("y".to_string()),
+            Token::Identifier("x".to_string()),
+            Token::Percentage,
             Token::Identifier("y".to_string()),
             Token::Eof,
         ];

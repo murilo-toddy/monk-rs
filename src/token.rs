@@ -16,7 +16,7 @@ pub enum Token {
     Bang,
     Asterisk,
     Slash,
-
+    Percentage,
 
     // Logical operations
     Eq,
@@ -92,6 +92,7 @@ impl std::fmt::Display for Token {
             Token::Bang => write!(f, "!"),
             Token::Asterisk => write!(f, "*"),
             Token::Slash => write!(f, "/"),
+            Token::Percentage => write!(f, "%"),
             Token::Eq => write!(f, "=="),
             Token::Neq => write!(f, "!="),
             Token::Gt => write!(f, ">"),

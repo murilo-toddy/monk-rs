@@ -78,7 +78,7 @@ impl<'a> Parser<'a> {
         match token {
             Token::Lbracket => Precedence::Index,
             Token::Lparen => Precedence::Call,
-            Token::Asterisk | Token::Slash => Precedence::Product,
+            Token::Asterisk | Token::Slash | Token::Percentage => Precedence::Product,
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Gt | Token::Lt | Token::Gte | Token::Lte => Precedence::LessGreater,
             Token::Or => Precedence::Or,
@@ -264,6 +264,7 @@ impl<'a> Parser<'a> {
                 Token::Plus
                 | Token::Minus
                 | Token::Slash
+                | Token::Percentage
                 | Token::Asterisk
                 | Token::Eq
                 | Token::Neq
@@ -844,6 +845,7 @@ mod parser_tests {
             ("5 - 5;", Program(vec![int_infix_template(5, "-", Token::Minus, 5)])),
             ("5 * 5;", Program(vec![int_infix_template(5, "*", Token::Asterisk, 5)])),
             ("5 / 5;", Program(vec![int_infix_template(5, "/", Token::Slash, 5)])),
+            ("5 % 5;", Program(vec![int_infix_template(5, "%", Token::Percentage, 5)])),
             ("5 > 5;", Program(vec![int_infix_template(5, ">", Token::Gt, 5)])),
             ("5 >= 5;", Program(vec![int_infix_template(5, ">=", Token::Gte, 5)])),
             ("5 < 5;", Program(vec![int_infix_template(5, "<", Token::Lt, 5)])),
