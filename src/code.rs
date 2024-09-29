@@ -33,14 +33,22 @@ pub fn disassemble(instructions: &Instructions) -> String {
 #[derive(Debug, Clone)]
 pub enum Opcode {
     OpConstant = 0,
-    OpAdd = 1,
+    OpPop = 1,
+    OpAdd = 2,
+    OpSub = 3,
+    OpMul = 4,
+    OpDiv = 5,
 }
 
 impl Opcode {
     pub fn from(v: u8) -> Option<Opcode> {
         match v {
             0 => Some(Opcode::OpConstant),
-            1 => Some(Opcode::OpAdd),
+            1 => Some(Opcode::OpPop),
+            2 => Some(Opcode::OpAdd),
+            3 => Some(Opcode::OpSub),
+            4 => Some(Opcode::OpMul),
+            5 => Some(Opcode::OpDiv),
             _ => None,
         }
     }
@@ -57,8 +65,24 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
             name: "OpConstant",
             operand_widths: vec![2],
         }),
+        Opcode::OpPop => Some(Definition {
+            name: "OpPop",
+            operand_widths: vec![],
+        }),
         Opcode::OpAdd => Some(Definition {
             name: "OpAdd",
+            operand_widths: vec![],
+        }),
+        Opcode::OpSub => Some(Definition {
+            name: "OpSub",
+            operand_widths: vec![],
+        }),
+        Opcode::OpMul => Some(Definition {
+            name: "OpMul",
+            operand_widths: vec![],
+        }),
+        Opcode::OpDiv => Some(Definition {
+            name: "OpDiv",
             operand_widths: vec![],
         }),
     }

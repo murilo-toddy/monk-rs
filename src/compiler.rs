@@ -36,33 +36,36 @@ impl Compiler {
 
     fn compile_expression(&mut self, expression: Expression) -> Result<(), String> {
         match expression {
-            Expression::Identifier { value, .. } => todo!(),
+            Expression::Identifier { .. } => todo!(),
             Expression::Integer { value, .. } => {
                 let obj = Object::Integer(value);
                 let pos = self.add_constant(obj);
                 self.emit(Opcode::OpConstant, vec![pos]);
                 Ok(())
             },
-            Expression::String { value, .. } => todo!(),
-            Expression::Boolean { value, .. } => todo!(),
-            Expression::Prefix { operator, right, .. } => todo!(),
+            Expression::String { .. } => todo!(),
+            Expression::Boolean { .. } => todo!(),
+            Expression::Prefix { .. } => todo!(),
             Expression::Infix { operator, left, right, .. } => {
                 self.compile_expression(*left)?;
                 self.compile_expression(*right)?;
                 match operator.as_str() {
                     "+" => self.emit(Opcode::OpAdd, vec![]),
+                    "-" => self.emit(Opcode::OpSub, vec![]),
+                    "*" => self.emit(Opcode::OpMul, vec![]),
+                    "/" => self.emit(Opcode::OpDiv, vec![]),
                     _ => return Err(format!("unknown operator {}", operator)),
                 };
                 return Ok(());
             },
-            Expression::If { conditions, alternative, .. } => todo!(),
-            Expression::Function { arguments, body, .. } => todo!(),
-            Expression::While { condition, statement, .. } => todo!(),
-            Expression::For { declaration, condition, operation, statement, .. } => todo!(),
-            Expression::Call { function, arguments, .. } => todo!(),
-            Expression::Array { elements, .. } => todo!(),
-            Expression::Hash { pairs, .. } => todo!(),
-            Expression::Index { left, index, .. } => todo!(),
+            Expression::If { .. } => todo!(),
+            Expression::Function { .. } => todo!(),
+            Expression::While { .. } => todo!(),
+            Expression::For { .. } => todo!(),
+            Expression::Call { .. } => todo!(),
+            Expression::Array { .. } => todo!(),
+            Expression::Hash { .. } => todo!(),
+            Expression::Index { .. } => todo!(),
         }
     }
 
@@ -71,7 +74,9 @@ impl Compiler {
             Statement::Let { .. } => todo!(),
             Statement::Return { .. } => todo!(),
             Statement::Expression { expression, .. } => {
-                expression.map_or(Ok(()), |e| self.compile_expression(e))
+                expression.map_or(Ok(()), |e| self.compile_expression(e))?;
+                self.emit(Opcode::OpPop, vec![]);
+                return Ok(())
             },
         }
     }
@@ -134,14 +139,55 @@ mod compiler_tests {
     fn test_integer_arithmetic() {
         let tests = vec![
             CompilerTestCase {
+                input: "1; 2",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    make(Opcode::OpConstant, vec![0]),
+                    make(Opcode::OpPop, vec![]),
+                    make(Opcode::OpConstant, vec![1]),
+                    make(Opcode::OpPop, vec![]),
+                ],
+            },
+            CompilerTestCase {
                 input: "1 + 2",
                 expected_constants: vec![Object::Integer(1), Object::Integer(2)],
                 expected_instructions: vec![
                     make(Opcode::OpConstant, vec![0]),
                     make(Opcode::OpConstant, vec![1]),
                     make(Opcode::OpAdd, vec![]),
+                    make(Opcode::OpPop, vec![]),
                 ],
-            }
+            },
+            CompilerTestCase {
+                input: "1 - 2",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    make(Opcode::OpConstant, vec![0]),
+                    make(Opcode::OpConstant, vec![1]),
+                    make(Opcode::OpSub, vec![]),
+                    make(Opcode::OpPop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 * 2",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    make(Opcode::OpConstant, vec![0]),
+                    make(Opcode::OpConstant, vec![1]),
+                    make(Opcode::OpMul, vec![]),
+                    make(Opcode::OpPop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "2 / 1",
+                expected_constants: vec![Object::Integer(2), Object::Integer(1)],
+                expected_instructions: vec![
+                    make(Opcode::OpConstant, vec![0]),
+                    make(Opcode::OpConstant, vec![1]),
+                    make(Opcode::OpDiv, vec![]),
+                    make(Opcode::OpPop, vec![]),
+                ],
+            },
         ];
         run_compiler_tests(tests);
     }

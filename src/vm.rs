@@ -1,4 +1,4 @@
-use crate::{code::{Instructions, Opcode}, compiler::{Bytecode, Compiler}, object::Object};
+use crate::{code::{Instructions, Opcode}, compiler::Bytecode, object::Object};
 
 const STACK_SIZE: usize = 2048;
 
@@ -19,6 +19,10 @@ impl Vm {
             stack: vec![None; STACK_SIZE],
             sp: 0,
         }
+    }
+
+    pub fn last_popped_elem(&mut self) -> Option<Object> {
+        return self.stack[self.sp].clone();
     }
 
     pub fn stack_top(&mut self) -> Option<Object> {
@@ -46,6 +50,29 @@ impl Vm {
         return obj;
     }
 
+    fn execute_binary_integer_operation(&mut self, op: Opcode, left: i64, right: i64) -> Result<(), String> {
+        let result = match op {
+            Opcode::OpAdd => left + right,
+            Opcode::OpSub => left - right,
+            Opcode::OpMul => left * right,
+            Opcode::OpDiv => left / right,
+            _ => return Err(format!("ERROR: unknown integer operation {:?}", op)),
+        };
+        self.push(Object::Integer(result))
+    }
+
+    fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), String> {
+        let right = self.pop();
+        let left = self.pop();
+        match (left, right) {
+            (Some(Object::Integer(left)), Some(Object::Integer(right))) => {
+                self.execute_binary_integer_operation(op, left, right)?;
+            },
+            _ => {},
+        }
+        Ok(())
+    }
+
     pub fn run(&mut self) -> Result<(), String> {
         let mut ip = 0;
         while ip < self.instructions.len() {
@@ -56,17 +83,12 @@ impl Vm {
                         ip += 2;
                         self.push(self.constants[index as usize].clone())?;
                     }
-                    Opcode::OpAdd => {
-                        let left = self.pop();
-                        let right = self.pop();
-                        match (left, right) {
-                            (Some(Object::Integer(left)), Some(Object::Integer(right))) => {
-                                self.push(Object::Integer(left + right))?;
-                            },
-                            _ => {},
-                        }
+                    Opcode::OpPop => {
+                        self.pop();
+                    },
+                    Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
+                        self.execute_binary_operation(op)?;
                     }
-                    _ => panic!("branch not covered")
                 }
                 ip += 1;
             } else {
@@ -80,7 +102,7 @@ impl Vm {
 #[cfg(test)]
 mod vm_tests {
     use super::*;
-    use crate::{ast::Program, lexer::Lexer, parser::Parser};
+    use crate::{ast::Program, lexer::Lexer, parser::Parser, compiler::Compiler};
 
     struct VmTestCase {
         input: &'static str,
@@ -98,7 +120,7 @@ mod vm_tests {
             if let Err(msg) = vm.run() {
                 panic!("vm error {}", msg);
             }
-            let stack_element = vm.stack_top();
+            let stack_element = vm.last_popped_elem();
             assert_eq!(Some(test.expected), stack_element);
         }
     }
@@ -115,6 +137,16 @@ mod vm_tests {
             VmTestCase { input: "1", expected: Object::Integer(1) },
             VmTestCase { input: "2", expected: Object::Integer(2) },
             VmTestCase { input: "1 + 2", expected: Object::Integer(3) },
+            VmTestCase { input: "1 - 2", expected: Object::Integer(-1) },
+            VmTestCase { input: "1 * 2", expected: Object::Integer(2) },
+            VmTestCase { input: "4 / 2", expected: Object::Integer(2) },
+            VmTestCase { input: "50 / 2 * 2 + 10 - 5", expected: Object::Integer(55) },
+            VmTestCase { input: "5 * (2 + 10)", expected: Object::Integer(60) },
+            VmTestCase { input: "5 + 5 + 5 + 5 - 10", expected: Object::Integer(10) },
+            VmTestCase { input: "2 * 2 * 2 * 2 * 2", expected: Object::Integer(32) },
+            VmTestCase { input: "5 * 2 + 10", expected: Object::Integer(20) },
+            VmTestCase { input: "5 + 2 * 10", expected: Object::Integer(25) },
+            VmTestCase { input: "5 * (2 + 10)", expected: Object::Integer(60) },
         ];
         run_vm_tests(tests);
     }

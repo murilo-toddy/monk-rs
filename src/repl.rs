@@ -23,7 +23,7 @@ fn compile(program: Program) -> String {
     if let Err(msg) = vm.run() {
         return format!("Running bytecode failed:\n{}\n", msg);
     }
-    match vm.stack_top() {
+    match vm.last_popped_elem() {
         Some(obj) => return obj.inspect(),
         None => "".to_owned(),
     }
