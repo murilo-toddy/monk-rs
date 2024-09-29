@@ -7,6 +7,7 @@ fn format_instruction(def: Definition, operands: Vec<i64>) -> String {
                        operands.len(), operand_count, def.name);
     }
     return match operand_count {
+        0 => def.name.to_owned(),
         1 => format!("{} {}", def.name, operands[0]),
         _ => format!("ERROR: unhandled operand count for {}", def.name),
     };
@@ -32,12 +33,14 @@ pub fn disassemble(instructions: &Instructions) -> String {
 #[derive(Debug, Clone)]
 pub enum Opcode {
     OpConstant = 0,
+    OpAdd = 1,
 }
 
 impl Opcode {
     pub fn from(v: u8) -> Option<Opcode> {
         match v {
             0 => Some(Opcode::OpConstant),
+            1 => Some(Opcode::OpAdd),
             _ => None,
         }
     }
@@ -53,7 +56,11 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::OpConstant => Some(Definition {
             name: "OpConstant",
             operand_widths: vec![2],
-        })
+        }),
+        Opcode::OpAdd => Some(Definition {
+            name: "OpAdd",
+            operand_widths: vec![],
+        }),
     }
 }
 
@@ -104,14 +111,14 @@ mod code_tests {
     #[test]
     fn test_instructions_string() {
         let instructions = vec![
-            make(Opcode::OpConstant, vec![1]),
+            make(Opcode::OpAdd, vec![]),
             make(Opcode::OpConstant, vec![2]),
             make(Opcode::OpConstant, vec![65535]),
         ];
 
-        let expected = "0000 OpConstant 1
-0003 OpConstant 2
-0006 OpConstant 65535
+        let expected = "0000 OpAdd
+0001 OpConstant 2
+0004 OpConstant 65535
 ";
 
         let instructions_concat: Instructions = instructions.into_iter().flatten().collect();
@@ -139,7 +146,8 @@ mod code_tests {
     #[test]
     fn test_make() {
         let tests = vec![
-            (Opcode::OpConstant, vec![65534], vec![Opcode::OpConstant as u8, 255 as u8, 254 as u8])
+            (Opcode::OpConstant, vec![65534], vec![Opcode::OpConstant as u8, 255 as u8, 254 as u8]),
+            (Opcode::OpAdd, vec![], vec![Opcode::OpAdd as u8]),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, operands);

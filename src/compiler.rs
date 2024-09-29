@@ -49,6 +49,10 @@ impl Compiler {
             Expression::Infix { operator, left, right, .. } => {
                 self.compile_expression(*left)?;
                 self.compile_expression(*right)?;
+                match operator.as_str() {
+                    "+" => self.emit(Opcode::OpAdd, vec![]),
+                    _ => return Err(format!("unknown operator {}", operator)),
+                };
                 return Ok(());
             },
             Expression::If { conditions, alternative, .. } => todo!(),
@@ -135,6 +139,7 @@ mod compiler_tests {
                 expected_instructions: vec![
                     make(Opcode::OpConstant, vec![0]),
                     make(Opcode::OpConstant, vec![1]),
+                    make(Opcode::OpAdd, vec![]),
                 ],
             }
         ];

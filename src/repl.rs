@@ -1,5 +1,10 @@
 use std::io::{self, BufRead, Write};
-use crate::{lexer, parser, evaluator::Evaluator, environment::Environment};
+use crate::{ast::Program, compiler::Compiler, environment::Environment, evaluator::Evaluator, lexer, parser, vm::Vm};
+
+enum ExecutionMode {
+    Interpreted,
+    Compiled,
+}
 
 fn print_parse_errors<W>(output: &mut W, errors: &Vec<parser::ParseError>) -> io::Result<()>
 where W: Write {
@@ -9,6 +14,29 @@ where W: Write {
     Ok(())
 }
 
+fn compile(program: Program) -> String {
+    let mut compiler = Compiler::new();
+    if let Err(msg) = compiler.compile(program) {
+        return format!("Compilation failed:\n{}\n", msg);
+    };
+    let mut vm = Vm::new(compiler.bytecode());
+    if let Err(msg) = vm.run() {
+        return format!("Running bytecode failed:\n{}\n", msg);
+    }
+    match vm.stack_top() {
+        Some(obj) => return obj.inspect(),
+        None => "".to_owned(),
+    }
+}
+
+fn interpret(evaluator: &mut Evaluator, program: Program) -> String {
+    let evaluated = evaluator.evaluate_program(program);
+    match evaluated {
+        Some(obj) => return obj.inspect(),
+        None => "".to_owned(),
+    }
+}
+
 pub fn start<R, W>(input: &mut R, output: &mut W) -> io::Result<()>
 where
     R: BufRead,
@@ -16,6 +44,8 @@ where
 {
     let env = Environment::new();
     let mut evaluator = Evaluator::new(env);
+
+    let mode = ExecutionMode::Compiled;
 
     output.write_all("\nMonkeyLang 0.1\n".as_bytes()).unwrap();
     output.write_all(">>> ".as_bytes()).unwrap();
@@ -31,11 +61,11 @@ where
                 continue;
             }
 
-            let evaluated = evaluator.evaluate_program(program);
-            match evaluated {
-                Some(obj) => output.write_all(obj.inspect().as_bytes())?,
-                None => continue,
+            let out = match mode {
+                ExecutionMode::Interpreted => interpret(&mut evaluator, program),
+                ExecutionMode::Compiled => compile(program),
             };
+            output.write_all(out.as_bytes())?;
         } else {
             eprintln!("ERROR: could not read input line");
         }
