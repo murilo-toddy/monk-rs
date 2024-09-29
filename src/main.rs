@@ -13,6 +13,7 @@ pub mod evaluator;
 pub mod environment;
 pub mod builtins;
 pub mod code;
+pub mod compiler;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
