@@ -1,7 +1,35 @@
-use std::collections::HashMap;
-
 pub type Instructions = Vec<u8>;
 
+fn format_instruction(def: Definition, operands: Vec<i64>) -> String {
+    let operand_count = def.operand_widths.len();
+    if operands.len() != operand_count {
+        return format!("ERROR: operand len {} does not match definition {} for {}",
+                       operands.len(), operand_count, def.name);
+    }
+    return match operand_count {
+        1 => format!("{} {}", def.name, operands[0]),
+        _ => format!("ERROR: unhandled operand count for {}", def.name),
+    };
+}
+
+pub fn disassemble(instructions: &Instructions) -> String {
+    let mut out = String::new();
+    let mut bytes_read = 0;
+
+    while bytes_read < instructions.len() {
+        if let Some(def) = lookup(instructions[bytes_read]) {
+            let (operands, n) = read_operands(&def, instructions[bytes_read + 1..].to_vec());
+            out.push_str(&format!("{:04} {}\n", bytes_read, format_instruction(def, operands)));
+            bytes_read += (1 + n) as usize;
+        } else {
+            out.push_str(&format!("ERROR: definition for {} not found\n", instructions[bytes_read]));
+            continue;
+        }
+    }
+    return out;
+}
+
+#[derive(Debug, Clone)]
 pub enum Opcode {
     OpConstant = 0,
 }
@@ -51,10 +79,63 @@ pub fn make(op: Opcode, operands: Vec<i64>) -> Vec<u8> {
     };
 }
 
+fn read_operands(def: &Definition, instructions: Instructions) -> (Vec<i64>, i64) {
+    let mut operands = vec![0; def.operand_widths.len()];
+    let mut offset = 0;
+
+    for (i, width) in def.operand_widths.iter().enumerate() {
+        match width {
+            2 => {
+                operands[i] = u16::from_be_bytes(
+                    instructions[offset..offset+2].try_into().unwrap()
+                ) as i64;
+            },
+            _ => {}
+        }
+        offset += width;
+    }
+    return (operands, offset as i64);
+}
+
 #[cfg(test)]
 mod code_tests {
     use super::*;
     
+    #[test]
+    fn test_instructions_string() {
+        let instructions = vec![
+            make(Opcode::OpConstant, vec![1]),
+            make(Opcode::OpConstant, vec![2]),
+            make(Opcode::OpConstant, vec![65535]),
+        ];
+
+        let expected = "0000 OpConstant 1
+0003 OpConstant 2
+0006 OpConstant 65535
+";
+
+        let instructions_concat: Instructions = instructions.into_iter().flatten().collect();
+        let instructions_str = disassemble(&instructions_concat);
+        assert_eq!(instructions_str, expected.to_owned(),
+            "instructions wrongly formatted. expected {} to be {}", instructions_str, expected
+        );
+    }
+
+    #[test]
+    fn test_read_operands() {
+        let tests = vec![
+            (Opcode::OpConstant, vec![65535], 2),
+        ];
+        for (opcode, operands, bytes_read) in tests {
+            let op = opcode.clone() as u8;
+            let def = lookup(op).expect(format!("definition not found for {:?}", op).as_str());
+            let instruction = make(opcode, operands.clone());
+            let (operands_read, n) = read_operands(&def, instruction[1..].to_vec());
+            assert_eq!(bytes_read, n, "expected {:?} bytes read but got {:?}", bytes_read, n);
+            assert_eq!(operands, operands_read, "expected {:?} to equal {:?}", operands, operands_read);
+        }
+    }
+
     #[test]
     fn test_make() {
         let tests = vec![
