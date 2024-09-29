@@ -32,23 +32,33 @@ pub fn disassemble(instructions: &Instructions) -> String {
 
 #[derive(Debug, Clone)]
 pub enum Opcode {
-    OpConstant = 0,
-    OpPop = 1,
-    OpAdd = 2,
-    OpSub = 3,
-    OpMul = 4,
-    OpDiv = 5,
+    Constant = 0,
+    Pop = 1,
+    Add = 2,
+    Sub = 3,
+    Mul = 4,
+    Div = 5,
+    True = 6,
+    False = 7,
+    Equal = 8,
+    NotEqual = 9,
+    GreaterThan = 10,
 }
 
 impl Opcode {
     pub fn from(v: u8) -> Option<Opcode> {
         match v {
-            0 => Some(Opcode::OpConstant),
-            1 => Some(Opcode::OpPop),
-            2 => Some(Opcode::OpAdd),
-            3 => Some(Opcode::OpSub),
-            4 => Some(Opcode::OpMul),
-            5 => Some(Opcode::OpDiv),
+            0 => Some(Opcode::Constant),
+            1 => Some(Opcode::Pop),
+            2 => Some(Opcode::Add),
+            3 => Some(Opcode::Sub),
+            4 => Some(Opcode::Mul),
+            5 => Some(Opcode::Div),
+            6 => Some(Opcode::True),
+            7 => Some(Opcode::False),
+            8 => Some(Opcode::Equal),
+            9 => Some(Opcode::NotEqual),
+            10 => Some(Opcode::GreaterThan),
             _ => None,
         }
     }
@@ -61,28 +71,48 @@ pub struct Definition {
 
 pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
     match opcode {
-        Opcode::OpConstant => Some(Definition {
+        Opcode::Constant => Some(Definition {
             name: "OpConstant",
             operand_widths: vec![2],
         }),
-        Opcode::OpPop => Some(Definition {
+        Opcode::Pop => Some(Definition {
             name: "OpPop",
             operand_widths: vec![],
         }),
-        Opcode::OpAdd => Some(Definition {
+        Opcode::Add => Some(Definition {
             name: "OpAdd",
             operand_widths: vec![],
         }),
-        Opcode::OpSub => Some(Definition {
+        Opcode::Sub => Some(Definition {
             name: "OpSub",
             operand_widths: vec![],
         }),
-        Opcode::OpMul => Some(Definition {
+        Opcode::Mul => Some(Definition {
             name: "OpMul",
             operand_widths: vec![],
         }),
-        Opcode::OpDiv => Some(Definition {
+        Opcode::Div => Some(Definition {
             name: "OpDiv",
+            operand_widths: vec![],
+        }),
+        Opcode::True => Some(Definition {
+            name: "OpTrue",
+            operand_widths: vec![],
+        }),
+        Opcode::False => Some(Definition {
+            name: "OpFalse",
+            operand_widths: vec![],
+        }),
+        Opcode::Equal => Some(Definition {
+            name: "OpEqual",
+            operand_widths: vec![],
+        }),
+        Opcode::NotEqual => Some(Definition {
+            name: "OpNotEqual",
+            operand_widths: vec![],
+        }),
+        Opcode::GreaterThan => Some(Definition {
+            name: "OpGreaterThan",
             operand_widths: vec![],
         }),
     }
@@ -135,9 +165,9 @@ mod code_tests {
     #[test]
     fn test_instructions_string() {
         let instructions = vec![
-            make(Opcode::OpAdd, vec![]),
-            make(Opcode::OpConstant, vec![2]),
-            make(Opcode::OpConstant, vec![65535]),
+            make(Opcode::Add, vec![]),
+            make(Opcode::Constant, vec![2]),
+            make(Opcode::Constant, vec![65535]),
         ];
 
         let expected = "0000 OpAdd
@@ -155,7 +185,7 @@ mod code_tests {
     #[test]
     fn test_read_operands() {
         let tests = vec![
-            (Opcode::OpConstant, vec![65535], 2),
+            (Opcode::Constant, vec![65535], 2),
         ];
         for (opcode, operands, bytes_read) in tests {
             let op = opcode.clone() as u8;
@@ -170,8 +200,8 @@ mod code_tests {
     #[test]
     fn test_make() {
         let tests = vec![
-            (Opcode::OpConstant, vec![65534], vec![Opcode::OpConstant as u8, 255 as u8, 254 as u8]),
-            (Opcode::OpAdd, vec![], vec![Opcode::OpAdd as u8]),
+            (Opcode::Constant, vec![65534], vec![Opcode::Constant as u8, 255 as u8, 254 as u8]),
+            (Opcode::Add, vec![], vec![Opcode::Add as u8]),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, operands);
