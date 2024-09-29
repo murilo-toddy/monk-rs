@@ -1,11 +1,11 @@
 use crate::{ast::{Expression, Program, Statement}, code::{make, Instructions, Opcode}, object::Object};
 
-struct Bytecode {
-    instructions: Instructions,
-    constants: Vec<Object>,
+pub struct Bytecode {
+    pub instructions: Instructions,
+    pub constants: Vec<Object>,
 }
 
-struct Compiler {
+pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
 }
