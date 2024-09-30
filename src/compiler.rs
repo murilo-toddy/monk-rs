@@ -53,7 +53,15 @@ impl Compiler {
                     Ok(())
                 }
             },
-            Expression::Prefix { .. } => todo!(),
+            Expression::Prefix { operator, right, .. } => {
+                self.compile_expression(*right)?;
+                match operator.as_str() {
+                    "-" => self.emit(Opcode::Minus, vec![]),
+                    "!" => self.emit(Opcode::Bang, vec![]),
+                    _ => return Err(format!("unknown prefix operator {}", operator)),
+                };
+                return Ok(());
+            },
             Expression::Infix { operator, left, right, .. } => {
                 if operator.as_str() == "<" {
                     self.compile_expression(*right)?;
@@ -71,7 +79,7 @@ impl Compiler {
                     "==" => self.emit(Opcode::Equal, vec![]),
                     "!=" => self.emit(Opcode::NotEqual, vec![]),
                     ">" => self.emit(Opcode::GreaterThan, vec![]),
-                    _ => return Err(format!("unknown operator {}", operator)),
+                    _ => return Err(format!("unknown infix operator {}", operator)),
                 };
                 return Ok(());
             },
@@ -200,6 +208,15 @@ mod compiler_tests {
                     make(Opcode::Pop, vec![]),
                 ],
             },
+            CompilerTestCase {
+                input: "-1",
+                expected_constants: vec![Object::Integer(1)],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Minus, vec![]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
         ];
         run_compiler_tests(tests);
     }
@@ -280,6 +297,15 @@ mod compiler_tests {
                     make(Opcode::True, vec![]),
                     make(Opcode::False, vec![]),
                     make(Opcode::NotEqual, vec![]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "!true",
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    make(Opcode::True, vec![]),
+                    make(Opcode::Bang, vec![]),
                     make(Opcode::Pop, vec![]),
                 ],
             },

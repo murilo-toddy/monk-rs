@@ -43,6 +43,8 @@ pub enum Opcode {
     Equal = 8,
     NotEqual = 9,
     GreaterThan = 10,
+    Minus = 11,
+    Bang = 12,
 }
 
 impl Opcode {
@@ -59,6 +61,8 @@ impl Opcode {
             8 => Some(Opcode::Equal),
             9 => Some(Opcode::NotEqual),
             10 => Some(Opcode::GreaterThan),
+            11 => Some(Opcode::Minus),
+            12 => Some(Opcode::Bang),
             _ => None,
         }
     }
@@ -113,6 +117,14 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         }),
         Opcode::GreaterThan => Some(Definition {
             name: "OpGreaterThan",
+            operand_widths: vec![],
+        }),
+        Opcode::Minus => Some(Definition {
+            name: "OpMinus",
+            operand_widths: vec![],
+        }),
+        Opcode::Bang => Some(Definition {
+            name: "OpBang",
             operand_widths: vec![],
         }),
     }

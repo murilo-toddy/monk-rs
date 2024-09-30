@@ -106,6 +106,27 @@ impl Vm {
         Ok(())
     }
 
+    fn execute_prefix_operation(&mut self, op: Opcode) -> Result<(), String> {
+        let right = self.pop();
+        match &right {
+            Some(Object::Integer(right)) => {
+                match op {
+                    Opcode::Minus => { self.push(Object::Integer(-*right))?; },
+                    Opcode::Bang => { self.push(Object::Boolean(*right == 0))?; },
+                    _ => return Err(format!("ERROR: unknown integer prefix {:?}", op)),
+                }
+            },
+            Some(Object::Boolean(right)) => {
+                match op {
+                    Opcode::Bang => { self.push(Object::Boolean(!right))?; }
+                    _ => return Err(format!("ERROR: unknown integer prefix {:?}", op)),
+                }
+            },
+            _ => return Err(format!("ERROR: comparison operation {:?} with unsupported args {:?}", op, right)),
+        };
+        Ok(())
+    }
+
     pub fn run(&mut self) -> Result<(), String> {
         let mut ip = 0;
         while ip < self.instructions.len() {
@@ -125,7 +146,10 @@ impl Vm {
                     Opcode::GreaterThan | Opcode::Equal | Opcode::NotEqual => {
                         self.execute_comparison_operation(op)?;
                     },
-                }
+                    Opcode::Minus | Opcode::Bang => {
+                        self.execute_prefix_operation(op)?;
+                    },
+                };
                 ip += 1;
             } else {
                 return Err(format!("Opcode for {} not found", self.instructions[ip]));
@@ -184,6 +208,12 @@ mod vm_tests {
             VmTestCase { input: "5 * 2 + 10", expected: Object::Integer(20) },
             VmTestCase { input: "5 + 2 * 10", expected: Object::Integer(25) },
             VmTestCase { input: "5 * (2 + 10)", expected: Object::Integer(60) },
+            VmTestCase { input: "-1", expected: Object::Integer(-1) },
+            VmTestCase { input: "-1", expected: Object::Integer(-1) },
+            VmTestCase { input: "-5", expected: Object::Integer(-5) },
+            VmTestCase { input: "-10", expected: Object::Integer(-10) },
+            VmTestCase { input: "-50 + 100 + -50", expected: Object::Integer(0) },
+            VmTestCase { input: "(5 + 10 * 2 + 15 / 3) * 2 + -10", expected: Object::Integer(50) },
         ];
         run_vm_tests(tests);
     }
@@ -209,7 +239,13 @@ mod vm_tests {
             VmTestCase { input: "(1 < 2) == true", expected: Object::Boolean(true) },
             VmTestCase { input: "(1 < 2) == false", expected: Object::Boolean(false) },
             VmTestCase { input: "(1 > 2) == true", expected: Object::Boolean(false) },
-            VmTestCase { input: "(1 > 2) == false", expected: Object::Boolean(true) }
+            VmTestCase { input: "(1 > 2) == false", expected: Object::Boolean(true) },
+            VmTestCase { input: "!true", expected: Object::Boolean(false) },
+            VmTestCase { input: "!false", expected: Object::Boolean(true) },
+            VmTestCase { input: "!5", expected: Object::Boolean(false) },
+            VmTestCase { input: "!!true", expected: Object::Boolean(true) },
+            VmTestCase { input: "!!false", expected: Object::Boolean(false) },
+            VmTestCase { input: "!!5", expected: Object::Boolean(true) },
         ];
         run_vm_tests(tests);
     }
