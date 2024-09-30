@@ -1,13 +1,22 @@
-use crate::{ast::{Expression, Program, Statement}, code::{make, Instructions, Opcode}, object::Object};
+use crate::{ast::{BlockStatement, Expression, Program, Statement}, code::{make, disassemble, Instructions, Opcode}, object::Object};
 
 pub struct Bytecode {
     pub instructions: Instructions,
     pub constants: Vec<Object>,
 }
 
+#[derive(Clone, Debug)]
+struct EmittedInstruction {
+    opcode: Opcode,
+    position: usize,
+}
+
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+
+    last_instruction: Option<EmittedInstruction>,
+    previous_instruction: Option<EmittedInstruction>,
 }
 
 impl Compiler {
@@ -15,23 +24,63 @@ impl Compiler {
         return Compiler {
             instructions: vec![],
             constants: vec![],
+
+            last_instruction: None,
+            previous_instruction: None,
         };
     }
     
+    fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
+        let previous = self.last_instruction.clone();
+        let last = EmittedInstruction {
+            opcode: op,
+            position: pos,
+        };
+        self.previous_instruction = previous;
+        self.last_instruction = Some(last);
+    }
+
+    fn is_last_instruction_pop(&self) -> bool {
+        return self.last_instruction.as_ref().map_or(false, |i| i.opcode == Opcode::Pop);
+    }
+
+    fn remove_last_pop(&mut self) {
+        if !self.is_last_instruction_pop() {
+            return;
+        }
+        if let Some(last_instruction) = &self.last_instruction {
+            self.instructions = self.instructions[..last_instruction.position].to_vec();
+            self.last_instruction = self.previous_instruction.clone();
+        }
+    }
+
+    fn replace_instruction(&mut self, position: usize, new_instruction: Instructions) {
+        self.instructions[position..position + new_instruction.len()].copy_from_slice(&new_instruction);
+    }
+
+    // NOTE: should be used only for replacing instructions with the same number of operands
+    fn change_operand(&mut self, position: usize, operand: i64) {
+        if let Some(new_instruction) = Opcode::from(self.instructions[position]).map(|op| make(op, vec![operand])) {
+            self.replace_instruction(position, new_instruction);
+        }
+    }
+
     fn add_constant(&mut self, obj: Object) -> i64 {
         self.constants.push(obj);
         return (self.constants.len() - 1) as i64;
     }
 
     fn add_instruction(&mut self, instruction: Vec<u8>) -> usize {
-        let new_instruction_idx = instruction.len();
+        let new_instruction_idx = self.instructions.len();
         self.instructions.extend(instruction);
         return new_instruction_idx;
     }
 
     fn emit(&mut self, op: Opcode, operands: Vec<i64>) -> usize {
-        let instruction = make(op, operands);
-        return self.add_instruction(instruction);
+        let instruction = make(op.clone(), operands);
+        let position = self.add_instruction(instruction);
+        self.set_last_instruction(op, position);
+        return position;
     }
 
     fn compile_expression(&mut self, expression: Expression) -> Result<(), String> {
@@ -83,7 +132,35 @@ impl Compiler {
                 };
                 return Ok(());
             },
-            Expression::If { .. } => todo!(),
+            Expression::If { conditions, alternative, .. } => {
+                // TODO: add support for else if
+                let (condition, consequence) = conditions[0].clone();
+                self.compile_expression(condition)?;
+                let jump_not_true_pos = self.emit(Opcode::JumpNotTrue, vec![9999]);
+
+                self.compile_block_statement(consequence)?;
+                self.remove_last_pop();
+
+                let jump_pos = self.emit(Opcode::Jump, vec![9999]);
+
+                let after_consequence_pos = self.instructions.len();
+                self.change_operand(jump_not_true_pos, after_consequence_pos as i64);
+
+                match alternative {
+                    Some(alternative) => {
+                        self.compile_block_statement(alternative)?;
+                        self.remove_last_pop();
+                    }
+                    None => {
+                        self.emit(Opcode::Null, vec![]);
+                    }
+                }
+
+                let after_alternative_pos = self.instructions.len();
+                self.change_operand(jump_pos, after_alternative_pos as i64);
+
+                return Ok(());
+            },
             Expression::Function { .. } => todo!(),
             Expression::While { .. } => todo!(),
             Expression::For { .. } => todo!(),
@@ -92,6 +169,13 @@ impl Compiler {
             Expression::Hash { .. } => todo!(),
             Expression::Index { .. } => todo!(),
         }
+    }
+
+    fn compile_block_statement(&mut self, block: BlockStatement) -> Result<(), String> {
+        for statement in block.statements {
+            self.compile_statement(statement)?;
+        }
+        Ok(())
     }
 
     fn compile_statement(&mut self, statement: Statement) -> Result<(), String> {
@@ -143,9 +227,9 @@ mod compiler_tests {
 
             let exp_concat: Instructions = test.expected_instructions.into_iter().flatten().collect();
             assert_eq!(exp_concat, bytecode.instructions, 
-                       "expected instructions to be {:?} but got {:?} in {}", disassemble(&exp_concat), disassemble(&bytecode.instructions), test.input);
+                       "wrong instructions\n    expected: {:?}\n    got:      {:?}\n    in {}", disassemble(&exp_concat), disassemble(&bytecode.instructions), test.input);
             assert_eq!(test.expected_constants, bytecode.constants,
-                       "expected constants to be {:?} but got {:?} in {}", test.expected_constants, bytecode.constants, test.input);
+                       "wrong constants\n       expected: {:?}\n    got:      {:?}\n    in {}", test.expected_constants, bytecode.constants, test.input);
         }
     }
 
@@ -311,5 +395,40 @@ mod compiler_tests {
             },
         ];
         run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "if (true) { 10 } else { 20 }; 3333",
+                expected_constants: vec![Object::Integer(10), Object::Integer(20), Object::Integer(3333)],
+                expected_instructions: vec![
+                    make(Opcode::True, vec![]),          // 0000
+                    make(Opcode::JumpNotTrue, vec![10]), // 0001
+                    make(Opcode::Constant, vec![0]),     // 0004
+                    make(Opcode::Jump, vec![13]),        // 0007
+                    make(Opcode::Constant, vec![1]),     // 0010
+                    make(Opcode::Pop, vec![]),           // 0013
+                    make(Opcode::Constant, vec![2]),     // 0014
+                    make(Opcode::Pop, vec![]),           // 0017
+                ],
+            },
+            CompilerTestCase {
+                input: "if (true) { 10 }; 3333",
+                expected_constants: vec![Object::Integer(10), Object::Integer(3333)],
+                expected_instructions: vec![
+                    make(Opcode::True, vec![]),          // 0000
+                    make(Opcode::JumpNotTrue, vec![10]), // 0001
+                    make(Opcode::Constant, vec![0]),     // 0004
+                    make(Opcode::Jump, vec![11]),        // 0007
+                    make(Opcode::Null, vec![]),          // 0010
+                    make(Opcode::Pop, vec![]),           // 0011
+                    make(Opcode::Constant, vec![1]),     // 0012
+                    make(Opcode::Pop, vec![]),           // 0015
+                ],
+            },
+        ];
+        run_compiler_tests(tests)
     }
 }

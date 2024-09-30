@@ -30,7 +30,7 @@ pub fn disassemble(instructions: &Instructions) -> String {
     return out;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Opcode {
     Constant = 0,
     Pop = 1,
@@ -45,6 +45,9 @@ pub enum Opcode {
     GreaterThan = 10,
     Minus = 11,
     Bang = 12,
+    Jump = 13,
+    JumpNotTrue = 14,
+    Null = 15,
 }
 
 impl Opcode {
@@ -63,6 +66,9 @@ impl Opcode {
             10 => Some(Opcode::GreaterThan),
             11 => Some(Opcode::Minus),
             12 => Some(Opcode::Bang),
+            13 => Some(Opcode::Jump),
+            14 => Some(Opcode::JumpNotTrue),
+            15 => Some(Opcode::Null),
             _ => None,
         }
     }
@@ -125,6 +131,18 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         }),
         Opcode::Bang => Some(Definition {
             name: "OpBang",
+            operand_widths: vec![],
+        }),
+        Opcode::Jump => Some(Definition {
+            name: "OpJump",
+            operand_widths: vec![2],
+        }),
+        Opcode::JumpNotTrue => Some(Definition {
+            name: "OpJumpNotTrue",
+            operand_widths: vec![2],
+        }),
+        Opcode::Null => Some(Definition {
+            name: "OpNull",
             operand_widths: vec![],
         }),
     }

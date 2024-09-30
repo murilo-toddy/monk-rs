@@ -122,6 +122,7 @@ impl Vm {
                     _ => return Err(format!("ERROR: unknown integer prefix {:?}", op)),
                 }
             },
+            Some(Object::Null) => { self.push(Object::Boolean(true))?; },
             _ => return Err(format!("ERROR: comparison operation {:?} with unsupported args {:?}", op, right)),
         };
         Ok(())
@@ -149,6 +150,20 @@ impl Vm {
                     Opcode::Minus | Opcode::Bang => {
                         self.execute_prefix_operation(op)?;
                     },
+                    Opcode::Jump => {
+                        let position = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
+                        ip = (position - 1) as usize;
+                    },
+                    Opcode::JumpNotTrue => {
+                        let position = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
+                        ip += 2;
+                        if let Some(condition) = self.pop() {
+                            if !is_truthy(&condition) {
+                                ip = (position - 1) as usize;
+                            }
+                        }
+                    }
+                    Opcode::Null => { self.push(Object::Null)?; },
                 };
                 ip += 1;
             } else {
@@ -157,6 +172,10 @@ impl Vm {
         }
         Ok(())
     }
+}
+
+fn is_truthy(object: &Object) -> bool {
+    !matches!(object, Object::Boolean(false) | Object::Integer(0) | Object::Null)
 }
 
 #[cfg(test)]
@@ -246,6 +265,23 @@ mod vm_tests {
             VmTestCase { input: "!!true", expected: Object::Boolean(true) },
             VmTestCase { input: "!!false", expected: Object::Boolean(false) },
             VmTestCase { input: "!!5", expected: Object::Boolean(true) },
+            VmTestCase { input: "!(if (false) { 5 })", expected: Object::Boolean(true) },
+            VmTestCase { input: "if ((if (false) { 10 })) { 10 } else { 20 }", expected: Object::Integer(20) },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_conditional_expressions() {
+        let tests = vec![
+            VmTestCase { input: "if (true) { 10 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (true) { 10 } else { 20 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (false) { 10 } else { 20 } ", expected: Object::Integer(20) },
+            VmTestCase { input: "if (1) { 10 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (1 < 2) { 10 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (1 < 2) { 10 } else { 20 }", expected: Object::Integer(10) },
+            VmTestCase { input: "if (1 > 2) { 10 } else { 20 }", expected: Object::Integer(20) },
+            VmTestCase { input: "if (1 > 2) { 10 }", expected: Object::Null },
         ];
         run_vm_tests(tests);
     }
