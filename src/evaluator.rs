@@ -295,7 +295,7 @@ impl Evaluator {
         match expression {
             Expression::Identifier { value, .. } => {
                 self.env.get(value)
-                    .or_else(|| self.builtin.get_function_object(&value))
+                    .or_else(|| self.builtin.get_function_object(value))
                     .unwrap_or(Object::Error(format!("identifier not found: {}", value)))
             },
             Expression::Integer { value, .. } => Object::Integer(value),

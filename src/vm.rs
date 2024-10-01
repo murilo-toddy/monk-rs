@@ -51,12 +51,12 @@ impl Vm {
     }
 
     fn current_frame(&mut self) -> &mut Option<Frame> {
-        return &mut self.frames[self.frame_index - 1]
+        &mut self.frames[self.frame_index - 1]
     }
 
     fn current_frame_ref(&self) -> Frame {
         // TODO: remove this clone
-        return self.frames[self.frame_index - 1].clone().expect("should always have a current frame")
+        self.frames[self.frame_index - 1].clone().expect("should always have a current frame")
     }
 
     fn push_frame(&mut self, frame: Frame) {
@@ -125,7 +125,7 @@ impl Vm {
                 self.execute_binary_integer_operation(op, *left, *right)?;
             },
             (Some(Object::String(left)), Some(Object::String(right))) => {
-                self.execute_binary_string_operation(op, *left, *right)?;
+                self.execute_binary_string_operation(op, left, right)?;
             },
             _ => return Err(format!("ERROR: binary operation {:?} with unsupported args {:?}, {:?}", op, left, right)),
         }
@@ -204,7 +204,7 @@ impl Vm {
             Some(Object::Hash(hash)) => {
                 match index {
                     Some(object) => Ok(hash.get(&object).cloned().unwrap_or(Object::Null)),
-                    None => Err(format!("could not fetch index")),
+                    None => Err("could not fetch index".to_string()),
                 }
             },
             _ => Err(format!("index operation not supported in {:?}", collection)),
@@ -213,10 +213,9 @@ impl Vm {
 
     fn build_array(&mut self, start_index: usize, end_index: usize) -> Result<Object, String> {
         match self.stack[start_index..end_index]
-            .into_iter()
-            .map(|o| 
-                o.clone().ok_or_else(|| format!("unable to build array, got empty object from stack"))
-            ).collect() {
+            .iter()
+            .map(|o| o.clone().ok_or_else(|| "unable to build array, got empty object from stack".to_string()))
+            .collect() {
                 Ok(elements) => Ok(Object::Array(elements)),
                 Err(msg) => Err(msg),
             }
@@ -225,10 +224,9 @@ impl Vm {
     fn build_hash(&mut self, start_index: usize, end_index: usize) -> Result<Object, String> {
         let mut hash_map = HashMap::<Object, Object>::new();
         match self.stack[start_index..end_index]
-            .into_iter()
-            .map(|o| 
-                o.clone().ok_or_else(|| format!("unable to build hash, got empty object from stack"))
-            ).collect::<Result<Vec<Object>, String>>() {
+            .iter()
+            .map(|o| o.clone().ok_or_else(|| "unable to build hash, got empty object from stack".to_string()))
+            .collect::<Result<Vec<Object>, String>>() {
                 Ok(elements) => {
                     elements.chunks_exact(2).for_each(|chunk| {
                         if let [key, value] = chunk {

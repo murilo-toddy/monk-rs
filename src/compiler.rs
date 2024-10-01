@@ -117,7 +117,9 @@ impl Compiler {
             let last_position = last_instruction.position;
             self.replace_instruction(last_position, make(Opcode::ReturnValue, vec![]));
         }
-        self.scopes[self.scope_index].last_instruction.as_mut().map(|i| i.opcode = op);
+        if let Some(instruction) = self.scopes[self.scope_index].last_instruction.as_mut() {
+            instruction.opcode = op
+        };
     }
 
     fn replace_instruction(&mut self, position: usize, new_instruction: Instructions) {
@@ -265,7 +267,7 @@ impl Compiler {
             },
             Expression::Array { elements, .. } => {
                 let array_len = elements.len();
-                elements.into_iter().map(|e| self.compile_expression(e)).collect::<Result<(), String>>()?;
+                elements.into_iter().try_for_each(|e| self.compile_expression(e))?;
                 self.emit(Opcode::Array, vec![array_len as i64]);
                 Ok(())
             },
@@ -273,7 +275,7 @@ impl Compiler {
                 let elements_count = 2 * pairs.len();
                 let mut sorted_pairs = pairs.clone();
                 sorted_pairs.sort_by_key(|(k1, k2)| k1 < k2);
-                sorted_pairs.into_iter().map(|(k, v)| self.compile_key_value_pair(k, v)).collect::<Result<(), String>>()?;
+                sorted_pairs.into_iter().try_for_each(|(k, v)| self.compile_key_value_pair(k, v))?;
                 self.emit(Opcode::Hash, vec![elements_count as i64]);
                 Ok(())
             },
