@@ -5,9 +5,9 @@ pub enum Token {
     
     // Identifiers
     // TODO add support for floats
-    Identifier(String),
+    Identifier(&'static str),
     Integer(i64),
-    String(String),
+    String(&'static str),
 
     // Operators
     Assign,
@@ -62,8 +62,8 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn from_literal(literal: String) -> Token {
-        match literal.as_str() {
+    pub fn from_literal(literal: &'static str) -> Token {
+        match literal {
             "fn" => Token::Function,
             "let" => Token::Let,
             "if" => Token::If,
@@ -76,55 +76,53 @@ impl Token {
             _ => Token::Identifier(literal),
         }
     }
-}
 
-impl std::fmt::Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn as_string(&self) -> &'static str {
         match self {
-            Token::Illegal(v) => write!(f, "{}", v),
-            Token::Eof => write!(f, "\0"),
-            Token::Identifier(v) => write!(f, "{}", v),
-            Token::Integer(v) => write!(f, "{}", v),
-            Token::String(v) => write!(f, "{}", v),
-            Token::Assign => write!(f, "="),
-            Token::Plus => write!(f, "+"),
-            Token::Minus => write!(f, "-"),
-            Token::Bang => write!(f, "!"),
-            Token::Asterisk => write!(f, "*"),
-            Token::Slash => write!(f, "/"),
-            Token::Percentage => write!(f, "%"),
-            Token::Eq => write!(f, "=="),
-            Token::Neq => write!(f, "!="),
-            Token::Gt => write!(f, ">"),
-            Token::Gte => write!(f, ">="),
-            Token::Lt => write!(f, "<"),
-            Token::Lte => write!(f, "<="),
-            Token::And => write!(f, "&&"),
-            Token::Or => write!(f, "||"),
-            Token::BitAnd => write!(f, "&"),
-            Token::BitOr => write!(f, "|"),
-            Token::BitXor => write!(f, "^"),
-            Token::BitShiftLeft => write!(f, "<<"),
-            Token::BitShiftRight => write!(f, ">>"),
-            Token::Comma => write!(f, ","),
-            Token::Colon => write!(f, ":"),
-            Token::Semicolon => write!(f, ";"),
-            Token::Lparen => write!(f, "("),
-            Token::Rparen => write!(f, ")"),
-            Token::Lbracket => write!(f, "["),
-            Token::Rbracket => write!(f, "]"),
-            Token::Lbrace => write!(f, "{{"),
-            Token::Rbrace => write!(f, "}}"),
-            Token::Function => write!(f, "fn"),
-            Token::Let => write!(f, "let"),
-            Token::If => write!(f, "if"),
-            Token::Else => write!(f, "else"),
-            Token::While => write!(f, "while"),
-            Token::For => write!(f, "for"),
-            Token::Return => write!(f, "return"),
-            Token::True => write!(f, "true"),
-            Token::False => write!(f, "false"),
-        }
-    }
+            Token::Illegal(v) => Box::leak(v.to_string().into_boxed_str()),
+            Token::Eof => "\0",
+            Token::Identifier(v) => *v,
+            Token::Integer(v) => Box::leak(v.to_string().into_boxed_str()),
+            Token::String(v) => *v,
+            Token::Assign => "=",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Bang => "!",
+            Token::Asterisk => "*",
+            Token::Slash => "/",
+            Token::Percentage => "%",
+            Token::Eq => "==",
+            Token::Neq => "!=",
+            Token::Gt => ">",
+            Token::Gte => ">=",
+            Token::Lt => "<",
+            Token::Lte => "<=",
+            Token::And => "&&",
+            Token::Or => "||",
+            Token::BitAnd => "&",
+            Token::BitOr => "|",
+            Token::BitXor => "^",
+            Token::BitShiftLeft => "<<",
+            Token::BitShiftRight => ">>",
+            Token::Comma => ",",
+            Token::Colon => ":",
+            Token::Semicolon => ";",
+            Token::Lparen => "(",
+            Token::Rparen => ")",
+            Token::Lbracket => "[",
+            Token::Rbracket => "]",
+            Token::Lbrace => "{{",
+            Token::Rbrace => "}}",
+            Token::Function => "fn",
+            Token::Let => "let",
+            Token::If => "if",
+            Token::Else => "else",
+            Token::While => "while",
+            Token::For => "for",
+            Token::Return => "return",
+            Token::True => "true",
+            Token::False => "false",
+       }
+   }
 }
 

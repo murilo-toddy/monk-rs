@@ -39,12 +39,12 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_identifier(&mut self) -> String {
+    fn read_identifier(&mut self) -> &'static str {
         let start_pos = self.position;
         while Self::is_letter(self.ch) {
             self.read_char();
         }
-        String::from_utf8(self.input[start_pos..self.position].to_vec()).unwrap()
+        return Box::leak(String::from_utf8(self.input[start_pos..self.position].to_vec()).expect("should be valid UTF8").into_boxed_str());
     }
 
     fn read_integer(&mut self) -> i64 {
@@ -58,7 +58,7 @@ impl<'a> Lexer<'a> {
             .expect("should be valid integer")
     }
 
-    fn read_string(&mut self) -> String {
+    fn read_string(&mut self) -> &'static str {
         let position = self.position + 1;
         loop { 
             self.read_char();
@@ -66,10 +66,7 @@ impl<'a> Lexer<'a> {
                 break
             }
         }
-        match String::from_utf8(self.input[position .. self.position].to_vec()) {
-            Ok(v) => v,
-            Err(e) => panic!("invalid UTF8 string {}", e)
-        }
+        Box::leak(String::from_utf8(self.input[position .. self.position].to_vec()).expect("should be valid UTF8").into_boxed_str())
     }
     
     fn skip_whitespace(&mut self) {
@@ -181,39 +178,39 @@ x % y
 
         let tests = vec![
             Token::Let,
-            Token::Identifier("five".to_string()),
+            Token::Identifier("five"),
             Token::Assign,
             Token::Integer(5),
             Token::Semicolon,
             Token::Let,
-            Token::Identifier("ten".to_string()),
+            Token::Identifier("ten"),
             Token::Assign,
             Token::Integer(10),
             Token::Semicolon,
             Token::Let,
-            Token::Identifier("add".to_string()),
+            Token::Identifier("add"),
             Token::Assign,
             Token::Function,
             Token::Lparen,
-            Token::Identifier("x".to_string()),
+            Token::Identifier("x"),
             Token::Comma,
-            Token::Identifier("y".to_string()),
+            Token::Identifier("y"),
             Token::Rparen,
             Token::Lbrace,
-            Token::Identifier("x".to_string()),
+            Token::Identifier("x"),
             Token::Plus,
-            Token::Identifier("y".to_string()),
+            Token::Identifier("y"),
             Token::Semicolon,
             Token::Rbrace,
             Token::Semicolon,
             Token::Let,
-            Token::Identifier("result".to_string()),
+            Token::Identifier("result"),
             Token::Assign,
-            Token::Identifier("add".to_string()),
+            Token::Identifier("add"),
             Token::Lparen,
-            Token::Identifier("five".to_string()),
+            Token::Identifier("five"),
             Token::Comma,
-            Token::Identifier("ten".to_string()),
+            Token::Identifier("ten"),
             Token::Rparen,
             Token::Semicolon,
             Token::Bang,
@@ -253,8 +250,8 @@ x % y
             Token::Neq,
             Token::Integer(9),
             Token::Semicolon,
-            Token::String("foobar".to_string()),
-            Token::String("foo bar".to_string()),
+            Token::String("foobar"),
+            Token::String("foo bar"),
             Token::Lbracket,
             Token::Integer(1),
             Token::Comma,
@@ -262,75 +259,75 @@ x % y
             Token::Rbracket,
             Token::Semicolon,
             Token::Lbrace,
-            Token::String("foo".to_string()),
+            Token::String("foo"),
             Token::Colon,
-            Token::String("bar".to_string()),
+            Token::String("bar"),
             Token::Rbrace,
             Token::Semicolon,
             Token::While,
             Token::Lparen,
-            Token::Identifier("x".to_string()),
+            Token::Identifier("x"),
             Token::Lt,
             Token::Integer(10),
             Token::Rparen,
             Token::Lbrace,
-            Token::Identifier("x".to_string()),
+            Token::Identifier("x"),
             Token::Plus,
             Token::Integer(1),
             Token::Rbrace,
             Token::For,
             Token::Lparen,
             Token::Let,
-            Token::Identifier("i".to_string()),
+            Token::Identifier("i"),
             Token::Assign,
             Token::Integer(0),
             Token::Semicolon,
-            Token::Identifier("i".to_string()),
+            Token::Identifier("i"),
             Token::Lt,
             Token::Integer(2),
             Token::Semicolon,
             Token::Let,
-            Token::Identifier("i".to_string()),
+            Token::Identifier("i"),
             Token::Assign,
-            Token::Identifier("i".to_string()),
+            Token::Identifier("i"),
             Token::Plus,
             Token::Integer(1),
             Token::Rparen,
             Token::Lbrace,
-            Token::Identifier("y".to_string()),
+            Token::Identifier("y"),
             Token::Assign,
-            Token::Identifier("i".to_string()),
+            Token::Identifier("i"),
             Token::Semicolon,
             Token::Rbrace,
-            Token::Identifier("x".to_string()),
+            Token::Identifier("x"),
             Token::And,
-            Token::Identifier("y".to_string()),
+            Token::Identifier("y"),
             Token::Or,
-            Token::Identifier("x".to_string()),
+            Token::Identifier("x"),
             Token::BitAnd,
-            Token::Identifier("y".to_string()),
+            Token::Identifier("y"),
             Token::And,
-            Token::Identifier("x".to_string()),
+            Token::Identifier("x"),
             Token::BitOr,
-            Token::Identifier("y".to_string()),
-            Token::Identifier("x".to_string()),
+            Token::Identifier("y"),
+            Token::Identifier("x"),
             Token::Lte,
-            Token::Identifier("y".to_string()),
-            Token::Identifier("x".to_string()),
+            Token::Identifier("y"),
+            Token::Identifier("x"),
             Token::Gte,
-            Token::Identifier("y".to_string()),
-            Token::Identifier("x".to_string()),
+            Token::Identifier("y"),
+            Token::Identifier("x"),
             Token::BitXor,
-            Token::Identifier("y".to_string()),
-            Token::Identifier("x".to_string()),
+            Token::Identifier("y"),
+            Token::Identifier("x"),
             Token::BitShiftLeft,
-            Token::Identifier("y".to_string()),
-            Token::Identifier("x".to_string()),
+            Token::Identifier("y"),
+            Token::Identifier("x"),
             Token::BitShiftRight,
-            Token::Identifier("y".to_string()),
-            Token::Identifier("x".to_string()),
+            Token::Identifier("y"),
+            Token::Identifier("x"),
             Token::Percentage,
-            Token::Identifier("y".to_string()),
+            Token::Identifier("y"),
             Token::Eof,
         ];
 

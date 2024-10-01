@@ -121,7 +121,7 @@ impl BuiltinFunctions {
         }
     }
 
-    pub fn get_function_object(&self, value: &String) -> Option<Object> {
+    pub fn get_function_object(&self, value: &'static str) -> Option<Object> {
         self.store.get(value).cloned()
     }
 }

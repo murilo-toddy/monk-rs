@@ -3,7 +3,7 @@ use crate::token::Token;
 #[derive(Eq, PartialEq, Debug, Clone, Hash)]
 pub struct Identifier { 
     pub token: Token,
-    pub value: String,
+    pub value: &'static str,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -27,7 +27,7 @@ pub enum Statement {
 pub enum Expression {
     Identifier {
         token: Token,
-        value: String,
+        value: &'static str,
     },
     Integer {
         token: Token,
@@ -35,7 +35,7 @@ pub enum Expression {
     },
     String {
         token: Token,
-        value: String,
+        value: &'static str,
     },
     Boolean {
         token: Token,
@@ -48,7 +48,7 @@ pub enum Expression {
     },
     Infix {
         token: Token,
-        operator: String,
+        operator: &'static str,
         left: Box<Expression>,
         right: Box<Expression>,
     },
@@ -133,15 +133,14 @@ impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Statement::Let { token, name, value } => {
-                write!(f, "{} {} = ", token, name)?;
+                write!(f, "{} {} = ", token.as_string(), name)?;
                 if let Some(value) = value {
                     write!(f, "{}", value)?;
                 }
                 write!(f, ";")?;
                 Ok(())
             },
-            Statement::Return { token, value } => {
-                write!(f, "{} ", token)?;
+            Statement::Return { value, .. } => {
                 if let Some(value) = value {
                     write!(f, "{}", value)?;
                 }

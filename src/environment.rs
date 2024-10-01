@@ -4,7 +4,7 @@ use crate::object::Object;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Environment {
-    store: HashMap<String, Object>,
+    store: HashMap<&'static str, Object>,
     outer: Option<Box<Environment>>,
 }
 
@@ -29,7 +29,7 @@ impl Environment {
         }
     }
 
-    pub fn get(&mut self, value: &String) -> Option<Object> {
+    pub fn get(&mut self, value: &'static str) -> Option<Object> {
         match self.store.get(value) {
             Some(value) => Some(value.clone()),
             None => {
@@ -41,7 +41,7 @@ impl Environment {
         }
     }
 
-    pub fn set(&mut self, name: String, value: Object) {
+    pub fn set(&mut self, name: &'static str, value: Object) {
         self.store.insert(name, value);
     }
 }

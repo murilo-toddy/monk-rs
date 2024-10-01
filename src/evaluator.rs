@@ -56,7 +56,7 @@ impl Evaluator {
                     return right_eval;
                 }
                 if self.env.get(&value).is_some() {
-                    self.env.set(value.to_owned(), right_eval.clone());
+                    self.env.set(value, right_eval.clone());
                     return right_eval;
                 } else {
                     return Object::Error(format!("identifier {} not found", value));
@@ -107,11 +107,11 @@ impl Evaluator {
         
     fn evaluate_infix_expression(
         &mut self,
-        operator: String, 
+        operator: &'static str, 
         left: Expression,
         right: Expression,
     ) -> Object {
-        if operator.as_str() == "=" {
+        if operator == "=" {
             return self.evaluate_reassign_expression(left, right);
         }
 
@@ -126,7 +126,7 @@ impl Evaluator {
 
         match (&left_eval, &right_eval) {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
-                match operator.as_str() {
+                match operator {
                     "+" => Object::Integer(left_val + right_val),
                     "-" => Object::Integer(left_val - right_val),
                     "*" => Object::Integer(left_val * right_val),
@@ -149,7 +149,7 @@ impl Evaluator {
                 }
             },
             (Object::Boolean(left_val), Object::Boolean(right_val)) => {
-                match operator.as_str() {
+                match operator {
                     "==" => Object::Boolean(left_val == right_val),
                     "!=" => Object::Boolean(left_val != right_val),
                     "&&" => Object::Boolean(*left_val && *right_val),
@@ -158,8 +158,8 @@ impl Evaluator {
                 }
             }
             (Object::String(left_val), Object::String(right_val)) => {
-                match operator.as_str() {
-                    "+" => Object::String(left_val.to_owned() + right_val),
+                match operator {
+                    "+" => Object::String(Box::leak((left_val.to_string() + right_val).into_boxed_str())),
                     "==" => Object::Boolean(left_val == right_val),
                     "!=" => Object::Boolean(left_val != right_val),
                     _ => Object::Error(format!("unknown operation: string {} string", operator))
@@ -372,7 +372,7 @@ impl Evaluator {
         if let Object::Function(arguments, _, environment) = func {
             let mut env = Environment::new_enclosed(environment);
             for (i, arg) in arguments.iter().enumerate() {
-                env.set(arg.value.clone(), args[i].clone());
+                env.set(arg.value, args[i].clone());
             }
             return env;
         }
@@ -470,8 +470,8 @@ mod evaluator_tests {
     #[test]
     fn test_string_expression_eval() {
         let tests = vec![
-            ("\"Hello World!\"", Object::String("Hello World!".to_string())),
-            ("\"Hello\" + \" \" + \"World!\"", Object::String("Hello World!".to_string())),
+            ("\"Hello World!\"", Object::String("Hello World!")),
+            ("\"Hello\" + \" \" + \"World!\"", Object::String("Hello World!")),
             ("\"a\" == \"a\"", Object::Boolean(true)),
             ("\"a\" == \"aa\"", Object::Boolean(false)),
             ("\"a\" == \"b\"", Object::Boolean(false)),
@@ -682,10 +682,10 @@ mod evaluator_tests {
         }
     }
 
-    fn identifier(value: &str) -> Identifier {
+    fn identifier(value: &'static str) -> Identifier {
         Identifier {
-            token: Token::Identifier(value.to_owned()),
-            value: value.to_owned(),
+            token: Token::Identifier(value),
+            value,
         }
     }
 
@@ -770,9 +770,9 @@ mod evaluator_tests {
                     false: 6
                  }",
                 Object::Hash(HashMap::from([
-                    (Object::String("one".to_owned()), Object::Integer(1)), 
-                    (Object::String("two".to_owned()), Object::Integer(2)), 
-                    (Object::String("three".to_owned()), Object::Integer(3)), 
+                    (Object::String("one"), Object::Integer(1)), 
+                    (Object::String("two"), Object::Integer(2)), 
+                    (Object::String("three"), Object::Integer(3)), 
                     (Object::Integer(4), Object::Integer(4)), 
                     (Object::Boolean(true), Object::Integer(5)), 
                     (Object::Boolean(false), Object::Integer(6)), 
@@ -818,7 +818,7 @@ mod evaluator_tests {
     fn test_variable_reassignment() {
         let tests = [
             ("let i = 1; i = 2; i", Object::Integer(2)),
-            ("let i = 1; i = \"hello\"; i", Object::String("hello".to_owned())),
+            ("let i = 1; i = \"hello\"; i", Object::String("hello")),
             ("i = 1; i", Object::Error("identifier i not found".to_owned())),
             (
                 "let arr = [0, 1, 2]; arr[0] = {}; arr", 
@@ -843,7 +843,7 @@ mod evaluator_tests {
             (
                 "let hash = {}; hash[\"a\"] = \"b\"; hash",
                 Object::Hash(HashMap::from([
-                    (Object::String("a".to_owned()), Object::String("b".to_owned()))
+                    (Object::String("a"), Object::String("b"))
                 ]))
             ),
         ];

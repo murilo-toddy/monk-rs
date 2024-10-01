@@ -223,7 +223,7 @@ impl<'a> Parser<'a> {
                 let right = self.parse_expression(Precedence::Lowest)?;
                 Some(Expression::Infix {
                     token,
-                    operator: "=".to_string(),
+                    operator: "=",
                     left: Box::from(left),
                     right: Box::from(right),
                 })
@@ -252,7 +252,7 @@ impl<'a> Parser<'a> {
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             _ => {
                 self.push_parse_error(
-                     &format!("cannot parse expression, unexpected {}", self.current_token)
+                     &format!("cannot parse expression, unexpected {}", self.current_token.as_string())
                 );
                 return None
             },
@@ -440,7 +440,7 @@ impl<'a> Parser<'a> {
         if let Token::Identifier(value) = &self.current_token {
             identifiers.push(Identifier {
                 token: self.current_token.clone(),
-                value: value.clone(),
+                value,
             });
         }
 
@@ -450,7 +450,7 @@ impl<'a> Parser<'a> {
             if let Token::Identifier(value) = &self.current_token {
                 identifiers.push(Identifier {
                     token: self.current_token.clone(),
-                    value: value.clone(),
+                    value,
                 });
             }
         }
@@ -483,10 +483,10 @@ impl<'a> Parser<'a> {
 
     fn parse_identifier(&mut self) -> Option<Expression> {
         let value = match &self.current_token {
-            Token::Identifier(value) => value.clone(),
+            Token::Identifier(value) => value,
             _ => {
                 self.push_parse_error(
-                    &format!("expected identifier, but got {}", self.current_token)
+                    &format!("expected identifier, but got {}", self.current_token.as_string())
                 );
                 return None
             }
@@ -502,7 +502,7 @@ impl<'a> Parser<'a> {
             Token::Integer(value) => value,
             _ => {
                 self.push_parse_error(
-                    &format!("expected integer, but got {}", self.current_token)
+                    &format!("expected integer, but got {}", self.current_token.as_string())
                 );
                 return None
             }
@@ -518,14 +518,14 @@ impl<'a> Parser<'a> {
             Token::String(value) => value,
             _ => {
                 self.push_parse_error(
-                    &format!("expected string, but got {}", self.current_token)
+                    &format!("expected string, but got {}", self.current_token.as_string())
                 );
                 return None;
             }
         };
         Some(Expression::String {
             token: self.current_token.clone(),
-            value: value.to_owned(),
+            value,
         })
     }
 
@@ -542,7 +542,7 @@ impl<'a> Parser<'a> {
         
         Some(Expression::Prefix {
             token: current_token.clone(),
-            operator: format!("{}", current_token),
+            operator: format!("{}", current_token.as_string()),
             right: Box::new(self.parse_expression(Precedence::Prefix)?),
         })
     }
@@ -554,7 +554,7 @@ impl<'a> Parser<'a> {
 
         Some(Expression::Infix {
             token: current_token.clone(),
-            operator: format!("{}", current_token),
+            operator: Box::leak(format!("{}", current_token.as_string()).into_boxed_str()),
             left: Box::new(left),
             right: Box::new(self.parse_expression(precedence).unwrap()),
         })
@@ -599,10 +599,10 @@ mod parser_tests {
         panic!();
     }
 
-    fn identifier(value: &str) -> Expression {
+    fn identifier(value: &'static str) -> Expression {
         Expression::Identifier {
-            token: Token::Identifier(value.to_owned()),
-            value: value.to_owned(),
+            token: Token::Identifier(value),
+            value,
         }
     }
 
@@ -620,10 +620,10 @@ mod parser_tests {
         }
     }
 
-    fn string(value: &str) -> Expression {
+    fn string(value: &'static str) -> Expression {
         Expression::String {
-            token: Token::String(value.to_owned()),
-            value: value.to_owned(),
+            token: Token::String(value),
+            value,
         }
     }
 
@@ -650,17 +650,17 @@ mod parser_tests {
             Program(vec![
                 Statement::Let {
                     token: Token::Let,
-                    name: Identifier { token: Token::Identifier("x".to_owned()), value: "x".to_owned() },
+                    name: Identifier { token: Token::Identifier("x"), value: "x" },
                     value: Some(integer(5)),
                 },
                 Statement::Let {
                     token: Token::Let,
-                    name: Identifier { token: Token::Identifier("y".to_owned()), value: "y".to_owned() },
+                    name: Identifier { token: Token::Identifier("y"), value: "y" },
                     value: Some(boolean(true)),
                 },
                 Statement::Let {
                     token: Token::Let,
-                    name: Identifier { token: Token::Identifier("foobar".to_owned()), value: "foobar".to_owned() },
+                    name: Identifier { token: Token::Identifier("foobar"), value: "foobar" },
                     value: Some(identifier("y")),
                 },
             ]),
@@ -711,7 +711,7 @@ mod parser_tests {
         assert_eq!(
             Program(vec![
                 Statement::Expression {
-                    token: Token::Identifier(expected_value.to_owned()),
+                    token: Token::Identifier(expected_value),
                     expression: Some(identifier(expected_value)),
                 },
             ]),
@@ -806,32 +806,32 @@ mod parser_tests {
 
     fn token_from_expression(expr: &Expression) -> Token {
         match expr {
-            Expression::Identifier { value, .. } => Token::Identifier(value.to_string()),
+            Expression::Identifier { value, .. } => Token::Identifier(value),
             Expression::Integer { value, .. } => Token::Integer(value.to_owned()),
             Expression::Index { left, .. } => token_from_expression(left),
             _ => Token::Illegal('1'),
         }
     }
 
-    fn infix_template(left: Expression, op: &str, op_token: Token, right: Expression) -> Statement {
+    fn infix_template(left: Expression, op: &'static str, op_token: Token, right: Expression) -> Statement {
         let token = token_from_expression(&left);
         Statement::Expression {
             token,
             expression: Some(Expression::Infix {
                 token: op_token,
-                operator: op.to_owned(),
+                operator: op,
                 left: Box::new(left),
                 right: Box::new(right),
             })
         }
     }
 
-    fn int_infix_template(left: i64, op: &str, op_token: Token, right: i64) -> Statement {
+    fn int_infix_template(left: i64, op: &'static str, op_token: Token, right: i64) -> Statement {
         Statement::Expression {
             token: Token::Integer(left),
             expression: Some(Expression::Infix {
                 token: op_token,
-                operator: op.to_owned(),
+                operator: op,
                 left: Box::new(integer(left)),
                 right: Box::new(integer(right)),
             })
@@ -889,7 +889,7 @@ mod parser_tests {
                         (
                             Expression::Infix {
                                 token: Token::Lt,
-                                operator: "<".to_owned(),
+                                operator: "<",
                                 left: Box::new(identifier("x")),
                                 right: Box::new(identifier("y")),
                             },
@@ -897,7 +897,7 @@ mod parser_tests {
                                 token: Token::Lbrace,
                                 statements: vec![
                                     Statement::Expression {
-                                        token: Token::Identifier("x".to_owned()), 
+                                        token: Token::Identifier("x"), 
                                         expression: Some(identifier("x")),
                                     },
                                 ],
@@ -926,7 +926,7 @@ mod parser_tests {
                     token: Token::While,
                     condition: Box::new(Expression::Infix {
                         token: Token::Lt,
-                        operator: "<".to_owned(),
+                        operator: "<",
                         left: Box::new(identifier("x")),
                         right: Box::new(identifier("y")),
                     }),
@@ -934,7 +934,7 @@ mod parser_tests {
                         token: Token::Lbrace,
                         statements: vec![
                             Statement::Expression {
-                                token: Token::Identifier("x".to_owned()), 
+                                token: Token::Identifier("x"), 
                                 expression: Some(identifier("x")),
                             },
                         ],
@@ -961,27 +961,27 @@ mod parser_tests {
                     declaration: Box::new(Statement::Let {
                         token: Token::Let,
                         name: Identifier {
-                            token: Token::Identifier("i".to_string()),
-                            value: "i".to_string(),
+                            token: Token::Identifier("i"),
+                            value: "i",
                         },
                         value: Some(integer(0)),
                     }),
                     condition: Box::new(Expression::Infix {
                         token: Token::Lt,
-                        operator: "<".to_owned(),
+                        operator: "<",
                         left: Box::new(identifier("i")),
                         right: Box::new(identifier("x")),
                     }),
                     operation: Box::new(Expression::Infix {
                         token: Token::Assign,
-                        operator: "=".to_owned(),
+                        operator: "=",
                         left: Box::from(Expression::Identifier {
-                            token: Token::Identifier("i".to_string()),
-                            value: "i".to_string(),
+                            token: Token::Identifier("i"),
+                            value: "i",
                         }),
                         right: Box::from(Expression::Infix {
                             token: Token::Plus,
-                            operator: "+".to_owned(),
+                            operator: "+",
                             left: Box::new(identifier("i")),
                             right: Box::new(integer(1)),
                         }),
@@ -990,7 +990,7 @@ mod parser_tests {
                         token: Token::Lbrace,
                         statements: vec![
                             Statement::Expression {
-                                token: Token::Identifier("x".to_owned()), 
+                                token: Token::Identifier("x"), 
                                 expression: Some(identifier("x")),
                             },
                         ],
@@ -1018,7 +1018,7 @@ mod parser_tests {
                         (
                             Expression::Infix {
                                 token: Token::Lt,
-                                operator: "<".to_owned(),
+                                operator: "<",
                                 left: Box::new(identifier("x")),
                                 right: Box::new(identifier("y")),
                             },
@@ -1026,7 +1026,7 @@ mod parser_tests {
                                 token: Token::Lbrace,
                                 statements: vec![
                                     Statement::Expression {
-                                        token: Token::Identifier("x".to_owned()), 
+                                        token: Token::Identifier("x"), 
                                         expression: Some(identifier("x")),
                                     },
                                 ],
@@ -1035,7 +1035,7 @@ mod parser_tests {
                         (
                             Expression::Infix {
                                 token: Token::Gt,
-                                operator: ">".to_owned(),
+                                operator: ">",
                                 left: Box::new(identifier("x")),
                                 right: Box::new(identifier("y")),
                             },
@@ -1043,7 +1043,7 @@ mod parser_tests {
                                 token: Token::Lbrace,
                                 statements: vec![
                                     Statement::Expression {
-                                        token: Token::Identifier("y".to_owned()), 
+                                        token: Token::Identifier("y"), 
                                         expression: Some(identifier("y")),
                                     },
                                 ],
@@ -1054,7 +1054,7 @@ mod parser_tests {
                         token: Token::Lbrace,
                         statements: vec![
                             Statement::Expression {
-                                token: Token::Identifier("z".to_owned()), 
+                                token: Token::Identifier("z"), 
                                 expression: Some(identifier("z")),
                             },
                         ],
@@ -1080,17 +1080,17 @@ mod parser_tests {
                     expression: Some(Expression::Function {
                         token: Token::Function,
                         arguments: vec![
-                            Identifier { token: Token::Identifier("x".to_owned()), value: "x".to_owned() },
-                            Identifier { token: Token::Identifier("y".to_owned()), value: "y".to_owned() },
+                            Identifier { token: Token::Identifier("x"), value: "x" },
+                            Identifier { token: Token::Identifier("y"), value: "y" },
                         ],
                         body: BlockStatement {
                             token: Token::Lbrace,
                             statements: vec![
                                 Statement::Expression {
-                                    token: Token::Identifier("x".to_owned()),
+                                    token: Token::Identifier("x"),
                                     expression: Some(Expression::Infix {
                                         token: Token::Plus,
-                                        operator: "+".to_owned(),
+                                        operator: "+",
                                         left: Box::new(identifier("x")),
                                         right: Box::new(identifier("y")),
                                     })
@@ -1115,7 +1115,7 @@ mod parser_tests {
         assert_eq!(
             Program(vec![
                 Statement::Expression {
-                    token: Token::Identifier("add".to_owned()),
+                    token: Token::Identifier("add"),
                     expression: Some(Expression::Call {
                         token: Token::Lparen,
                         function: Box::new(identifier("add")),
@@ -1123,13 +1123,13 @@ mod parser_tests {
                             Expression::Integer { token: Token::Integer(1), value: 1 },
                             Expression::Infix {
                                 token: Token::Asterisk,
-                                operator: "*".to_owned(),
+                                operator: "*",
                                 left: Box::new(integer(2)),
                                 right: Box::new(integer(3)),
                             },
                             Expression::Infix {
                                 token: Token::Plus,
-                                operator: "+".to_owned(),
+                                operator: "+",
                                 left: Box::new(integer(4)),
                                 right: Box::new(integer(5)),
                             },
@@ -1193,8 +1193,8 @@ mod parser_tests {
             Statement::Let {
                 token: Token::Let,
                 name: Identifier {
-                    token: Token::Identifier("my_var".to_owned()),
-                    value: "my_var".to_owned(),
+                    token: Token::Identifier("my_var"),
+                    value: "my_var",
                 },
                 value: Some(identifier("another_var")),
         }]);
@@ -1212,10 +1212,10 @@ mod parser_tests {
         assert_eq!(
             Program(vec![
                 Statement::Expression {
-                    token: Token::String("hello world".to_owned()),
+                    token: Token::String("hello world"),
                     expression: Some(Expression::String { 
-                        token: Token::String("hello world".to_owned()),
-                        value: "hello world".to_string() 
+                        token: Token::String("hello world"),
+                        value: "hello world",
                     }),
                 }
             ]),
@@ -1244,13 +1244,13 @@ mod parser_tests {
                             },
                             Expression::Infix {
                                 token: Token::Asterisk,
-                                operator: "*".to_owned(),
+                                operator: "*",
                                 left: Box::new(integer(2)),
                                 right: Box::new(integer(2)),
                             },
                             Expression::Infix {
                                 token: Token::Plus,
-                                operator: "+".to_owned(),
+                                operator: "+",
                                 left: Box::new(integer(3)),
                                 right: Box::new(integer(3)),
                             },
@@ -1328,7 +1328,7 @@ mod parser_tests {
                                 string("one"),
                                 Expression::Infix {
                                     token: Token::Plus,
-                                    operator: "+".to_owned(),
+                                    operator: "+",
                                     left: Box::new(integer(0)),
                                     right: Box::new(integer(1)),
                                 },
@@ -1337,7 +1337,7 @@ mod parser_tests {
                                 string("two"), 
                                 Expression::Infix {
                                     token: Token::Minus,
-                                    operator: "-".to_owned(),
+                                    operator: "-",
                                     left: Box::new(integer(10)),
                                     right: Box::new(integer(8)),
                                 },
@@ -1346,7 +1346,7 @@ mod parser_tests {
                                 boolean(true), 
                                 Expression::Infix {
                                     token: Token::Slash,
-                                    operator: "/".to_owned(),
+                                    operator: "/",
                                     left: Box::new(integer(15)),
                                     right: Box::new(integer(5)),
                                 },
@@ -1370,16 +1370,16 @@ mod parser_tests {
         assert_eq!(
             Program(vec![
                 Statement::Expression {
-                    token: Token::Identifier("myArray".to_owned()),
+                    token: Token::Identifier("myArray"),
                     expression: Some(Expression::Index { 
                         token: Token::Lbracket,
                         left: Box::new(Expression::Identifier { 
-                            token: Token::Identifier("myArray".to_owned()),
-                            value: "myArray".to_owned()
+                            token: Token::Identifier("myArray"),
+                            value: "myArray"
                         }),
                         index: Box::new(Expression::Infix {
                             token: Token::Plus,
-                            operator: "+".to_owned(),
+                            operator: "+",
                             left: Box::new(integer(1)),
                             right: Box::new(integer(1)),
                         }),
