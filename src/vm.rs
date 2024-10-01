@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{code::{Instructions, Opcode}, compiler::Bytecode, object::Object};
 
 const STACK_SIZE: usize = 2048;
@@ -78,12 +80,23 @@ impl Vm {
         self.push(Object::Integer(result))
     }
 
+    fn execute_binary_string_operation(&mut self, op: Opcode, left: &'static str, right: &'static str) -> Result<(), String> {
+        let result = match op {
+            Opcode::Add => Box::leak((left.to_string() + right).into_boxed_str()),
+            _ => return Err(format!("ERROR: unknown string operation {:?}", op)),
+        };
+        self.push(Object::String(result))
+    }
+
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), String> {
         let right = self.pop();
         let left = self.pop();
         match (&left, &right) {
             (Some(Object::Integer(left)), Some(Object::Integer(right))) => {
                 self.execute_binary_integer_operation(op, *left, *right)?;
+            },
+            (Some(Object::String(left)), Some(Object::String(right))) => {
+                self.execute_binary_string_operation(op, *left, *right)?;
             },
             _ => return Err(format!("ERROR: binary operation {:?} with unsupported args {:?}, {:?}", op, left, right)),
         }
@@ -145,6 +158,36 @@ impl Vm {
         Ok(())
     }
 
+    fn build_array(&mut self, start_index: usize, end_index: usize) -> Result<Object, String> {
+        match self.stack[start_index..end_index]
+            .into_iter()
+            .map(|o| 
+                o.clone().ok_or_else(|| format!("unable to build array, got empty object from stack"))
+            ).collect() {
+                Ok(elements) => Ok(Object::Array(elements)),
+                Err(msg) => Err(msg),
+            }
+    }
+
+    fn build_hash(&mut self, start_index: usize, end_index: usize) -> Result<Object, String> {
+        let mut hash_map = HashMap::<Object, Object>::new();
+        match self.stack[start_index..end_index]
+            .into_iter()
+            .map(|o| 
+                o.clone().ok_or_else(|| format!("unable to build hash, got empty object from stack"))
+            ).collect::<Result<Vec<Object>, String>>() {
+                Ok(elements) => {
+                    elements.chunks_exact(2).for_each(|chunk| {
+                        if let [key, value] = chunk {
+                            hash_map.insert(key.clone(), value.clone());
+                        };
+                    });
+                    Ok(Object::Hash(hash_map))
+                },
+                Err(msg) => Err(msg),
+            }
+    }
+
     pub fn run(&mut self) -> Result<(), String> {
         let mut ip = 0;
         while ip < self.instructions.len() {
@@ -193,6 +236,20 @@ impl Vm {
                             self.push(global)?;
                         }
                     },
+                    Opcode::Array => {
+                        let array_len = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap()) as usize;
+                        ip += 2;
+                        let array = self.build_array(self.sp - array_len, self.sp)?;
+                        self.sp -= array_len;
+                        self.push(array)?;
+                    },
+                    Opcode::Hash => {
+                        let elements_count = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap()) as usize;
+                        ip += 2;
+                        let hash = self.build_hash(self.sp - elements_count, self.sp)?;
+                        self.sp -= elements_count;
+                        self.push(hash)?;
+                    },
                 };
                 ip += 1;
             } else {
@@ -215,6 +272,8 @@ fn is_truthy(object: &Object) -> bool {
 
 #[cfg(test)]
 mod vm_tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{ast::Program, lexer::Lexer, parser::Parser, compiler::Compiler};
 
@@ -328,6 +387,51 @@ mod vm_tests {
             VmTestCase { input: "let one = 1; one", expected: Object::Integer(1) },
             VmTestCase { input: "let one = 1; let two = 2; one + two;", expected: Object::Integer(3) },
             VmTestCase { input: "let one = 1; let two = one + one; one + two;", expected: Object::Integer(3) },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let tests = vec![
+            VmTestCase { input: "\"monkey\"", expected: Object::String("monkey") },
+            VmTestCase { input: "\"mon\" + \"key\"", expected: Object::String("monkey") },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let tests = vec![
+            VmTestCase { input: "[]", expected: Object::Array(vec![]) },
+            VmTestCase { input: "[1, 2, 3]", expected: Object::Array(vec![Object::Integer(1), Object::Integer(2), Object::Integer(3)]) },
+            VmTestCase { input: "[1 + 2, 3 * 4, 6 - 5]", expected: Object::Array(vec![Object::Integer(3), Object::Integer(12), Object::Integer(1)]) },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let tests = vec![
+            VmTestCase { input: "{}", expected: Object::Hash(HashMap::new()) },
+            VmTestCase { 
+                input: "{1: 2, 2: 3}",
+                expected: Object::Hash(
+                    HashMap::from([
+                        (Object::Integer(1), Object::Integer(2)),
+                        (Object::Integer(2), Object::Integer(3)),
+                    ])
+                ),
+            },
+            VmTestCase { 
+                input: "{1 + 1: 2 * 2, 3 + 3: 4 * 4}",
+                expected: Object::Hash(
+                    HashMap::from([
+                        (Object::Integer(2), Object::Integer(4)),
+                        (Object::Integer(6), Object::Integer(16)),
+                    ])
+                ),
+            },
         ];
         run_vm_tests(tests);
     }

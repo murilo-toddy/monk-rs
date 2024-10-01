@@ -3,8 +3,12 @@ pub type Instructions = Vec<u8>;
 fn format_instruction(def: Definition, operands: Vec<i64>) -> String {
     let operand_count = def.operand_widths.len();
     if operands.len() != operand_count {
-        return format!("ERROR: operand len {} does not match definition {} for {}",
-                       operands.len(), operand_count, def.name);
+        return format!(
+            "ERROR: operand len {} does not match definition {} for {}",
+            operands.len(),
+            operand_count,
+            def.name
+        );
     }
     match operand_count {
         0 => def.name.to_owned(),
@@ -20,10 +24,17 @@ pub fn disassemble(instructions: &Instructions) -> String {
     while bytes_read < instructions.len() {
         if let Some(def) = lookup(instructions[bytes_read]) {
             let (operands, n) = read_operands(&def, instructions[bytes_read + 1..].to_vec());
-            out.push_str(&format!("{:04} {}\n", bytes_read, format_instruction(def, operands)));
+            out.push_str(&format!(
+                "{:04} {}\n",
+                bytes_read,
+                format_instruction(def, operands)
+            ));
             bytes_read += (1 + n) as usize;
         } else {
-            out.push_str(&format!("ERROR: definition for {} not found\n", instructions[bytes_read]));
+            out.push_str(&format!(
+                "ERROR: definition for {} not found\n",
+                instructions[bytes_read]
+            ));
             continue;
         }
     }
@@ -50,6 +61,8 @@ pub enum Opcode {
     Null = 15,
     SetGlobal = 16,
     GetGlobal = 17,
+    Array = 18,
+    Hash = 19,
 }
 
 impl Opcode {
@@ -73,6 +86,8 @@ impl Opcode {
             15 => Some(Opcode::Null),
             16 => Some(Opcode::SetGlobal),
             17 => Some(Opcode::GetGlobal),
+            18 => Some(Opcode::Array),
+            19 => Some(Opcode::Hash),
             _ => None,
         }
     }
@@ -83,80 +98,32 @@ pub struct Definition {
     operand_widths: Vec<usize>,
 }
 
+pub fn generate_definition(name: &'static str, operand_widths: Vec<usize>) -> Option<Definition> {
+    Some(Definition { name, operand_widths })
+}
+
 pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
     match opcode {
-        Opcode::Constant => Some(Definition {
-            name: "OpConstant",
-            operand_widths: vec![2],
-        }),
-        Opcode::Pop => Some(Definition {
-            name: "OpPop",
-            operand_widths: vec![],
-        }),
-        Opcode::Add => Some(Definition {
-            name: "OpAdd",
-            operand_widths: vec![],
-        }),
-        Opcode::Sub => Some(Definition {
-            name: "OpSub",
-            operand_widths: vec![],
-        }),
-        Opcode::Mul => Some(Definition {
-            name: "OpMul",
-            operand_widths: vec![],
-        }),
-        Opcode::Div => Some(Definition {
-            name: "OpDiv",
-            operand_widths: vec![],
-        }),
-        Opcode::True => Some(Definition {
-            name: "OpTrue",
-            operand_widths: vec![],
-        }),
-        Opcode::False => Some(Definition {
-            name: "OpFalse",
-            operand_widths: vec![],
-        }),
-        Opcode::Equal => Some(Definition {
-            name: "OpEqual",
-            operand_widths: vec![],
-        }),
-        Opcode::NotEqual => Some(Definition {
-            name: "OpNotEqual",
-            operand_widths: vec![],
-        }),
-        Opcode::GreaterThan => Some(Definition {
-            name: "OpGreaterThan",
-            operand_widths: vec![],
-        }),
-        Opcode::Minus => Some(Definition {
-            name: "OpMinus",
-            operand_widths: vec![],
-        }),
-        Opcode::Bang => Some(Definition {
-            name: "OpBang",
-            operand_widths: vec![],
-        }),
-        Opcode::Jump => Some(Definition {
-            name: "OpJump",
-            operand_widths: vec![2],
-        }),
-        Opcode::JumpNotTrue => Some(Definition {
-            name: "OpJumpNotTrue",
-            operand_widths: vec![2],
-        }),
-        Opcode::Null => Some(Definition {
-            name: "OpNull",
-            operand_widths: vec![],
-        }),
-        Opcode::SetGlobal => Some(Definition {
-            name: "OpSetGlobal",
-            operand_widths: vec![2],
-        }),
-        Opcode::GetGlobal => Some(Definition {
-            name: "OpGetGlobal",
-            operand_widths: vec![2],
-        }),
+        Opcode::Constant => generate_definition("OpConstant", vec![2]),
+        Opcode::Pop => generate_definition("OpPop", vec![]),
+        Opcode::Add => generate_definition("OpAdd", vec![]),
+        Opcode::Sub => generate_definition("OpSub", vec![]),
+        Opcode::Mul => generate_definition("OpMul", vec![]),
+        Opcode::Div => generate_definition("OpDiv", vec![]),
+        Opcode::True => generate_definition("OpTrue", vec![]),
+        Opcode::False => generate_definition("OpFalse", vec![]),
+        Opcode::Equal => generate_definition("OpEqual", vec![]),
+        Opcode::NotEqual => generate_definition("OpNotEqual", vec![]),
+        Opcode::GreaterThan => generate_definition("OpGreaterThan", vec![]),
+        Opcode::Minus => generate_definition("OpMinus", vec![]),
+        Opcode::Bang => generate_definition("OpBang", vec![]),
+        Opcode::Jump => generate_definition("OpJump", vec![2]),
+        Opcode::JumpNotTrue => generate_definition("OpJumpNotTrue", vec![2]),
+        Opcode::Null => generate_definition("OpNull", vec![]),
+        Opcode::SetGlobal => generate_definition("OpSetGlobal", vec![2]),
+        Opcode::GetGlobal => generate_definition("OpGetGlobal", vec![2]),
+        Opcode::Array => generate_definition("OpArray", vec![2]),
+        Opcode::Hash => generate_definition("OpHash", vec![2]),
     }
 }
 
@@ -166,18 +133,19 @@ pub fn lookup(op: u8) -> Option<Definition> {
 
 pub fn make(op: Opcode, operands: Vec<i64>) -> Vec<u8> {
     match get_definition(&op) {
-        Some(def) => 
-            vec![op as u8].into_iter().chain(
+        Some(def) => vec![op as u8]
+            .into_iter()
+            .chain(
                 operands
                     .into_iter()
                     .zip(def.operand_widths)
-                    .flat_map(|(operand, width)|
-                        match width {
-                            2 => (operand as i16).to_be_bytes().to_vec(),
-                            _ => vec![],
-                        }
-                    ).collect::<Vec<u8>>()
-            ).collect(),
+                    .flat_map(|(operand, width)| match width {
+                        2 => (operand as i16).to_be_bytes().to_vec(),
+                        _ => vec![],
+                    })
+                    .collect::<Vec<u8>>(),
+            )
+            .collect(),
         None => vec![],
     }
 }
@@ -189,10 +157,9 @@ fn read_operands(def: &Definition, instructions: Instructions) -> (Vec<i64>, i64
     for (i, width) in def.operand_widths.iter().enumerate() {
         match width {
             2 => {
-                operands[i] = u16::from_be_bytes(
-                    instructions[offset..offset+2].try_into().unwrap()
-                ) as i64;
-            },
+                operands[i] =
+                    u16::from_be_bytes(instructions[offset..offset + 2].try_into().unwrap()) as i64;
+            }
             _ => {}
         }
         offset += width;
@@ -203,7 +170,7 @@ fn read_operands(def: &Definition, instructions: Instructions) -> (Vec<i64>, i64
 #[cfg(test)]
 mod code_tests {
     use super::*;
-    
+
     #[test]
     fn test_instructions_string() {
         let instructions = vec![
@@ -219,35 +186,53 @@ mod code_tests {
 
         let instructions_concat: Instructions = instructions.into_iter().flatten().collect();
         let instructions_str = disassemble(&instructions_concat);
-        assert_eq!(instructions_str, expected.to_owned(),
-            "instructions wrongly formatted. expected {} to be {}", instructions_str, expected
+        assert_eq!(
+            instructions_str,
+            expected.to_owned(),
+            "instructions wrongly formatted. expected {} to be {}",
+            instructions_str,
+            expected
         );
     }
 
     #[test]
     fn test_read_operands() {
-        let tests = vec![
-            (Opcode::Constant, vec![65535], 2),
-        ];
+        let tests = vec![(Opcode::Constant, vec![65535], 2)];
         for (opcode, operands, bytes_read) in tests {
             let op = opcode.clone() as u8;
             let def = lookup(op).expect(format!("definition not found for {:?}", op).as_str());
             let instruction = make(opcode, operands.clone());
             let (operands_read, n) = read_operands(&def, instruction[1..].to_vec());
-            assert_eq!(bytes_read, n, "expected {:?} bytes read but got {:?}", bytes_read, n);
-            assert_eq!(operands, operands_read, "expected {:?} to equal {:?}", operands, operands_read);
+            assert_eq!(
+                bytes_read, n,
+                "expected {:?} bytes read but got {:?}",
+                bytes_read, n
+            );
+            assert_eq!(
+                operands, operands_read,
+                "expected {:?} to equal {:?}",
+                operands, operands_read
+            );
         }
     }
 
     #[test]
     fn test_make() {
         let tests = vec![
-            (Opcode::Constant, vec![65534], vec![Opcode::Constant as u8, 255 as u8, 254 as u8]),
+            (
+                Opcode::Constant,
+                vec![65534],
+                vec![Opcode::Constant as u8, 255 as u8, 254 as u8],
+            ),
             (Opcode::Add, vec![], vec![Opcode::Add as u8]),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, operands);
-            assert_eq!(instruction, expected, "expected instruction to be {:?} but got {:?}", expected, instruction);
+            assert_eq!(
+                instruction, expected,
+                "expected instruction to be {:?} but got {:?}",
+                expected, instruction
+            );
         }
     }
 }

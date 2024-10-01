@@ -101,6 +101,11 @@ impl Compiler {
         position
     }
 
+    fn compile_key_value_pair(&mut self, key: Expression, value: Expression) -> Result<(), String> {
+        self.compile_expression(key)?;
+        self.compile_expression(value)
+    }
+
     fn compile_expression(&mut self, expression: Expression) -> Result<(), String> {
         match expression {
             Expression::Identifier { value, .. } => {
@@ -118,7 +123,11 @@ impl Compiler {
                 self.emit(Opcode::Constant, vec![pos]);
                 Ok(())
             },
-            Expression::String { .. } => todo!(),
+            Expression::String { value, .. } => {
+                let pos = self.add_constant(Object::String(value));
+                self.emit(Opcode::Constant, vec![pos]);
+                Ok(())
+            },
             Expression::Boolean { value, .. } => {
                 if value {
                     self.emit(Opcode::True, vec![]);
@@ -191,8 +200,20 @@ impl Compiler {
             Expression::While { .. } => todo!(),
             Expression::For { .. } => todo!(),
             Expression::Call { .. } => todo!(),
-            Expression::Array { .. } => todo!(),
-            Expression::Hash { .. } => todo!(),
+            Expression::Array { elements, .. } => {
+                let array_len = elements.len();
+                elements.into_iter().map(|e| self.compile_expression(e)).collect::<Result<(), String>>()?;
+                self.emit(Opcode::Array, vec![array_len as i64]);
+                Ok(())
+            },
+            Expression::Hash { pairs, .. } => {
+                let elements_count = 2 * pairs.len();
+                let mut sorted_pairs = pairs.clone();
+                sorted_pairs.sort_by_key(|(k1, k2)| k1 < k2);
+                sorted_pairs.into_iter().map(|(k, v)| self.compile_key_value_pair(k, v)).collect::<Result<(), String>>()?;
+                self.emit(Opcode::Hash, vec![elements_count as i64]);
+                Ok(())
+            },
             Expression::Index { .. } => todo!(),
         }
     }
@@ -498,6 +519,133 @@ mod compiler_tests {
                     make(Opcode::Pop, vec![0]),
                 ],
             }
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "\"monkey\"",
+                expected_constants: vec![Object::String("monkey")],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Pop, vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "\"mon\" + \"key\"",
+                expected_constants: vec![Object::String("mon"), Object::String("key")],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Add, vec![]),
+                    make(Opcode::Pop, vec![0]),
+                ],
+            }
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "[]",
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    make(Opcode::Array, vec![0]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "[1, 2, 3]",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2), Object::Integer(3)],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Array, vec![3]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "[1 + 2, 3 - 4, 5 * 6]",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2), Object::Integer(3), Object::Integer(4), Object::Integer(5), Object::Integer(6)],
+                expected_instructions:  vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Add, vec![]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Constant, vec![3]),
+                    make(Opcode::Sub, vec![]),
+                    make(Opcode::Constant, vec![4]),
+                    make(Opcode::Constant, vec![5]),
+                    make(Opcode::Mul, vec![]),
+                    make(Opcode::Array, vec![3]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "{}",
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    make(Opcode::Hash, vec![0]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2, 3: 4, 5: 6}",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                    Object::Integer(6),
+                ],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Constant, vec![3]),
+                    make(Opcode::Constant, vec![4]),
+                    make(Opcode::Constant, vec![5]),
+                    make(Opcode::Hash, vec![6]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2 + 3, 4: 5 * 6}",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                    Object::Integer(6),
+                ],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Add, vec![]),
+                    make(Opcode::Constant, vec![3]),
+                    make(Opcode::Constant, vec![4]),
+                    make(Opcode::Constant, vec![5]),
+                    make(Opcode::Mul, vec![]),
+                    make(Opcode::Hash, vec![4]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
         ];
         run_compiler_tests(tests);
     }
