@@ -15,6 +15,7 @@ pub mod builtins;
 pub mod code;
 pub mod compiler;
 pub mod vm;
+pub mod symbol;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();

@@ -48,6 +48,8 @@ pub enum Opcode {
     Jump = 13,
     JumpNotTrue = 14,
     Null = 15,
+    SetGlobal = 16,
+    GetGlobal = 17,
 }
 
 impl Opcode {
@@ -69,6 +71,8 @@ impl Opcode {
             13 => Some(Opcode::Jump),
             14 => Some(Opcode::JumpNotTrue),
             15 => Some(Opcode::Null),
+            16 => Some(Opcode::SetGlobal),
+            17 => Some(Opcode::GetGlobal),
             _ => None,
         }
     }
@@ -144,6 +148,14 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::Null => Some(Definition {
             name: "OpNull",
             operand_widths: vec![],
+        }),
+        Opcode::SetGlobal => Some(Definition {
+            name: "OpSetGlobal",
+            operand_widths: vec![2],
+        }),
+        Opcode::GetGlobal => Some(Definition {
+            name: "OpGetGlobal",
+            operand_widths: vec![2],
         }),
     }
 }

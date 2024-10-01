@@ -1,5 +1,5 @@
 use std::io::{self, BufRead, Write};
-use crate::{ast::Program, compiler::Compiler, environment::Environment, evaluator::Evaluator, lexer, parser, vm::Vm};
+use crate::{compiler::Compiler, environment::Environment, evaluator::Evaluator, lexer, parser, vm::Vm};
 
 enum ExecutionMode {
     Interpreted,
@@ -14,29 +14,6 @@ where W: Write {
     Ok(())
 }
 
-fn compile(program: Program) -> String {
-    let mut compiler = Compiler::new();
-    if let Err(msg) = compiler.compile(program) {
-        return format!("Compilation failed:\n{}\n", msg);
-    };
-    let mut vm = Vm::new(compiler.bytecode());
-    if let Err(msg) = vm.run() {
-        return format!("Running bytecode failed:\n{}\n", msg);
-    }
-    match vm.last_popped_elem() {
-        Some(obj) => return obj.inspect(),
-        None => "".to_owned(),
-    }
-}
-
-fn interpret(evaluator: &mut Evaluator, program: Program) -> String {
-    let evaluated = evaluator.evaluate_program(program);
-    match evaluated {
-        Some(obj) => return obj.inspect(),
-        None => "".to_owned(),
-    }
-}
-
 pub fn start<R, W>(input: &mut R, output: &mut W) -> io::Result<()>
 where
     R: BufRead,
@@ -44,6 +21,9 @@ where
 {
     let env = Environment::new();
     let mut evaluator = Evaluator::new(env);
+
+    let mut compiler = Compiler::new();
+    let mut vm = Vm::new();
 
     let mode = ExecutionMode::Compiled;
 
@@ -62,8 +42,33 @@ where
             }
 
             let out = match mode {
-                ExecutionMode::Interpreted => interpret(&mut evaluator, program),
-                ExecutionMode::Compiled => compile(program),
+                ExecutionMode::Interpreted => {
+                    let evaluated = evaluator.evaluate_program(program);
+                    match evaluated {
+                        Some(obj) => obj.inspect(),
+                        None => "".to_owned(),
+                    }
+                }
+                ExecutionMode::Compiled => {
+                    compiler = compiler.reset();
+                    let mut error_message = String::new();
+                    if let Err(msg) = compiler.compile(program) {
+                        error_message = format!("Compilation failed:\n{}\n", msg);
+                    };
+                    // TODO remove this clone
+                    vm = vm.reset(compiler.clone().bytecode());
+                    if let Err(msg) = vm.run() {
+                        error_message = format!("Running bytecode failed:\n{}\n", msg);
+                    }
+                    if !error_message.is_empty() {
+                        error_message
+                    } else {
+                        match vm.last_popped_elem() {
+                            Some(obj) => obj.inspect(),
+                            None => "".to_owned(),
+                        }
+                    }
+                }
             };
             output.write_all(out.as_bytes())?;
         } else {

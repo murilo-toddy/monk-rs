@@ -1,6 +1,7 @@
 use crate::{code::{Instructions, Opcode}, compiler::Bytecode, object::Object};
 
 const STACK_SIZE: usize = 2048;
+pub const GLOBALS_SIZE: usize = 10;
 
 pub struct Vm {
     constants: Vec<Object>,
@@ -8,16 +9,32 @@ pub struct Vm {
 
     stack: Vec<Option<Object>>, // TODO is this gonna haunt me?
     sp: usize, // top of the stack is stac[sp - 1]
+
+    globals: Vec<Option<Object>>
 }
 
 impl Vm {
-    pub fn new(bytecode: Bytecode) -> Vm {
+    pub fn new() -> Vm {
+        Vm {
+            constants: vec![],
+            instructions: vec![],
+
+            stack: vec![None; STACK_SIZE],
+            sp: 0,
+
+            globals: vec![None; GLOBALS_SIZE],
+        }
+    }
+
+    pub fn reset(&mut self, bytecode: Bytecode) -> Vm {
         Vm {
             constants: bytecode.constants,
             instructions: bytecode.instructions,
 
             stack: vec![None; STACK_SIZE],
             sp: 0,
+
+            globals: self.globals.clone(),
         }
     }
 
@@ -164,6 +181,18 @@ impl Vm {
                         }
                     }
                     Opcode::Null => { self.push(Object::Null)?; },
+                    Opcode::SetGlobal => {
+                        let global_index = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
+                        ip += 2;
+                        self.globals[global_index as usize] = self.pop();
+                    },
+                    Opcode::GetGlobal => {
+                        let global_index = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
+                        ip += 2;
+                        if let Some(global) = self.globals[global_index as usize].clone() {
+                            self.push(global)?;
+                        }
+                    },
                 };
                 ip += 1;
             } else {
@@ -195,7 +224,8 @@ mod vm_tests {
             if let Err(msg) = compiler.compile(program) {
                 panic!("compiler error {}", msg);
             }
-            let mut vm = Vm::new(compiler.bytecode());
+            let mut vm = Vm::new();
+            let mut vm = vm.reset(compiler.bytecode());
             if let Err(msg) = vm.run() {
                 panic!("vm error {}", msg);
             }
@@ -282,6 +312,16 @@ mod vm_tests {
             VmTestCase { input: "if (1 < 2) { 10 } else { 20 }", expected: Object::Integer(10) },
             VmTestCase { input: "if (1 > 2) { 10 } else { 20 }", expected: Object::Integer(20) },
             VmTestCase { input: "if (1 > 2) { 10 }", expected: Object::Null },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_let_global_statements() {
+        let tests = vec![
+            VmTestCase { input: "let one = 1; one", expected: Object::Integer(1) },
+            VmTestCase { input: "let one = 1; let two = 2; one + two;", expected: Object::Integer(3) },
+            VmTestCase { input: "let one = 1; let two = one + one; one + two;", expected: Object::Integer(3) },
         ];
         run_vm_tests(tests);
     }

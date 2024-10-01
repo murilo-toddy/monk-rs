@@ -1,5 +1,6 @@
-use crate::{ast::{BlockStatement, Expression, Program, Statement}, code::{make, disassemble, Instructions, Opcode}, object::Object};
+use crate::{ast::{BlockStatement, Expression, Program, Statement}, code::{make, Instructions, Opcode}, object::Object, symbol::SymbolTable};
 
+#[derive(Clone)]
 pub struct Bytecode {
     pub instructions: Instructions,
     pub constants: Vec<Object>,
@@ -11,12 +12,15 @@ struct EmittedInstruction {
     position: usize,
 }
 
+#[derive(Clone)]
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
 
     last_instruction: Option<EmittedInstruction>,
     previous_instruction: Option<EmittedInstruction>,
+
+    symbol_table: SymbolTable,
 }
 
 impl Compiler {
@@ -27,9 +31,23 @@ impl Compiler {
 
             last_instruction: None,
             previous_instruction: None,
+
+            symbol_table: SymbolTable::new(),
         };
     }
-    
+
+    pub fn reset(&mut self) -> Compiler {
+        Compiler {
+            instructions: vec![],
+            constants: self.constants.clone(),
+
+            last_instruction: None,
+            previous_instruction: None,
+
+            symbol_table: self.symbol_table.clone(),
+        }
+    }
+
     fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
         let previous = self.last_instruction.clone();
         let last = EmittedInstruction {
@@ -85,7 +103,15 @@ impl Compiler {
 
     fn compile_expression(&mut self, expression: Expression) -> Result<(), String> {
         match expression {
-            Expression::Identifier { .. } => todo!(),
+            Expression::Identifier { value, .. } => {
+                match self.symbol_table.resolve(value) {
+                    Some(symbol) => {
+                        self.emit(Opcode::GetGlobal, vec![symbol.index as i64]);
+                        Ok(())
+                    },
+                    None => Err(format!("undefined variable {}", value)),
+                }
+            },
             Expression::Integer { value, .. } => {
                 let obj = Object::Integer(value);
                 let pos = self.add_constant(obj);
@@ -112,7 +138,7 @@ impl Compiler {
                 return Ok(());
             },
             Expression::Infix { operator, left, right, .. } => {
-                if operator.as_str() == "<" {
+                if operator == "<" {
                     self.compile_expression(*right)?;
                     self.compile_expression(*left)?;
                     self.emit(Opcode::GreaterThan, vec![]);
@@ -120,7 +146,7 @@ impl Compiler {
                 }
                 self.compile_expression(*left)?;
                 self.compile_expression(*right)?;
-                match operator.as_str() {
+                match operator {
                     "+" => self.emit(Opcode::Add, vec![]),
                     "-" => self.emit(Opcode::Sub, vec![]),
                     "*" => self.emit(Opcode::Mul, vec![]),
@@ -180,7 +206,14 @@ impl Compiler {
 
     fn compile_statement(&mut self, statement: Statement) -> Result<(), String> {
         match statement {
-            Statement::Let { .. } => todo!(),
+            Statement::Let { name, value, .. } => {
+                if let Some(value) = value {
+                    self.compile_expression(value)?;
+                    let symbol = self.symbol_table.define(name.value);
+                    self.emit(Opcode::SetGlobal, vec![symbol.index as i64]);
+                }
+                Ok(())
+            },
             Statement::Return { .. } => todo!(),
             Statement::Expression { expression, .. } => {
                 expression.map_or(Ok(()), |e| self.compile_expression(e))?;
@@ -430,5 +463,36 @@ mod compiler_tests {
             },
         ];
         run_compiler_tests(tests)
+    }
+
+    #[test]
+    fn test_global_let_statements() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "let one = 1; let two = 2; one;",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2)],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::SetGlobal, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::SetGlobal, vec![1]),
+                    make(Opcode::GetGlobal, vec![0]),
+                    make(Opcode::Pop, vec![0]),
+                ],
+            },
+            CompilerTestCase {
+                input: "let one = 1; let two = one; two;",
+                expected_constants: vec![Object::Integer(1)],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::SetGlobal, vec![0]),
+                    make(Opcode::GetGlobal, vec![0]),
+                    make(Opcode::SetGlobal, vec![1]),
+                    make(Opcode::GetGlobal, vec![1]),
+                    make(Opcode::Pop, vec![0]),
+                ],
+            }
+        ];
+        run_compiler_tests(tests);
     }
 }
