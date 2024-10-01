@@ -1,43 +1,72 @@
 use std::collections::HashMap;
 
-use crate::{code::{Instructions, Opcode}, compiler::Bytecode, object::Object};
+use crate::{code::Opcode, compiler::Bytecode, frame::Frame, object::Object};
 
 const STACK_SIZE: usize = 2048;
-pub const GLOBALS_SIZE: usize = 10;
+const GLOBALS_SIZE: usize = 10;
+const MAX_FRAMES: usize = 1024;
 
 pub struct Vm {
     constants: Vec<Object>,
-    instructions: Instructions,
 
     stack: Vec<Option<Object>>, // TODO is this gonna haunt me?
     sp: usize, // top of the stack is stac[sp - 1]
 
-    globals: Vec<Option<Object>>
+    globals: Vec<Option<Object>>,
+
+    frames: Vec<Option<Frame>>,
+    frame_index: usize,
 }
 
 impl Vm {
     pub fn new() -> Vm {
         Vm {
             constants: vec![],
-            instructions: vec![],
 
             stack: vec![None; STACK_SIZE],
             sp: 0,
 
             globals: vec![None; GLOBALS_SIZE],
+
+            frames: vec![],
+            frame_index: 0,
         }
     }
 
     pub fn reset(&mut self, bytecode: Bytecode) -> Vm {
+        let main_frame = Frame::new(bytecode.instructions);
+        let mut frames = vec![None; MAX_FRAMES];
+        frames[0] = Some(main_frame);
         Vm {
             constants: bytecode.constants,
-            instructions: bytecode.instructions,
 
             stack: vec![None; STACK_SIZE],
             sp: 0,
 
             globals: self.globals.clone(),
+
+            frames,
+            frame_index: 1,
         }
+    }
+
+    fn current_frame(&mut self) -> &mut Option<Frame> {
+        return &mut self.frames[self.frame_index - 1]
+    }
+
+    fn current_frame_ref(&self) -> Frame {
+        // TODO: remove this clone
+        return self.frames[self.frame_index - 1].clone().expect("should always have a current frame")
+    }
+
+    fn push_frame(&mut self, frame: Frame) {
+        self.frames[self.frame_index] = Some(frame);
+        self.frame_index += 1;
+    }
+
+    fn pop_frame(&mut self) -> Option<Frame> {
+        self.frame_index -= 1;
+        self.frames.pop().flatten()
     }
 
     pub fn last_popped_elem(&mut self) -> Option<Object> {
@@ -212,14 +241,30 @@ impl Vm {
             }
     }
 
+    fn ip_add(&mut self, value: i64) {
+        if let Some(frame) = self.current_frame() { 
+            frame.ip += value; 
+        }
+    }
+
+    fn ip_set(&mut self, value: i64) {
+        if let Some(frame) = self.current_frame() {
+            frame.ip = value;
+        }
+    }
+
     pub fn run(&mut self) -> Result<(), String> {
-        let mut ip = 0;
-        while ip < self.instructions.len() {
-            if let Some(op) = Opcode::from(self.instructions[ip]) {
+        while self.current_frame_ref().ip < self.current_frame_ref().instructions().len() as i64 - 1 {
+            self.ip_add(1);
+            let ip = self.current_frame_ref().ip as usize;
+            let instructions = self.current_frame_ref().instructions();
+            let op = Opcode::from(instructions[ip]);
+
+            if let Some(op) = op {
                 match op {
                     Opcode::Constant => {
-                        let index = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
-                        ip += 2;
+                        let index = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap());
+                        self.ip_add(2);
                         self.push(self.constants[index as usize].clone())?;
                     }
                     Opcode::Pop => { self.pop(); },
@@ -235,41 +280,41 @@ impl Vm {
                         self.execute_prefix_operation(op)?;
                     },
                     Opcode::Jump => {
-                        let position = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
-                        ip = (position - 1) as usize;
+                        let position = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap());
+                        self.ip_set((position - 1) as i64);
                     },
                     Opcode::JumpNotTrue => {
-                        let position = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
-                        ip += 2;
+                        let position = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap());
+                        self.ip_add(2);
                         if let Some(condition) = self.pop() {
                             if !is_truthy(&condition) {
-                                ip = (position - 1) as usize;
+                                self.ip_set((position - 1) as i64);
                             }
                         }
                     }
                     Opcode::Null => { self.push(Object::Null)?; },
                     Opcode::SetGlobal => {
-                        let global_index = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
-                        ip += 2;
+                        let global_index = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap());
+                        self.ip_add(2);
                         self.globals[global_index as usize] = self.pop();
                     },
                     Opcode::GetGlobal => {
-                        let global_index = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap());
-                        ip += 2;
+                        let global_index = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap());
+                        self.ip_add(2);
                         if let Some(global) = self.globals[global_index as usize].clone() {
                             self.push(global)?;
                         }
                     },
                     Opcode::Array => {
-                        let array_len = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap()) as usize;
-                        ip += 2;
+                        let array_len = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap()) as usize;
+                        self.ip_add(2);
                         let array = self.build_array(self.sp - array_len, self.sp)?;
                         self.sp -= array_len;
                         self.push(array)?;
                     },
                     Opcode::Hash => {
-                        let elements_count = u16::from_be_bytes(self.instructions[ip+1..ip+3].try_into().unwrap()) as usize;
-                        ip += 2;
+                        let elements_count = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap()) as usize;
+                        self.ip_add(2);
                         let hash = self.build_hash(self.sp - elements_count, self.sp)?;
                         self.sp -= elements_count;
                         self.push(hash)?;
@@ -282,10 +327,30 @@ impl Vm {
                             Err(msg) => return Err(msg),
                         }
                     },
+                    Opcode::Call => {
+                        match &self.stack[self.sp - 1] {
+                            Some(Object::CompiledFunction(function)) => {
+                                self.push_frame(Frame::new(function.clone()));
+                            },
+                            _ => return Err(format!("attempting to call non-function {:?}", self.stack[self.sp - 1])),
+                        };
+                    }, 
+                    Opcode::Return => {
+                        self.pop_frame();
+                        self.pop();
+                        self.push(Object::Null)?;
+                    },
+                    Opcode::ReturnValue => {
+                        let return_value = self.pop();
+                        self.pop_frame();
+                        self.pop();
+                        if let Some(value) = return_value {
+                            self.push(value)?;
+                        }
+                    },
                 };
-                ip += 1;
             } else {
-                return Err(format!("Opcode for {} not found", self.instructions[ip]));
+                return Err(format!("Opcode for {} not found", instructions[ip]));
             }
         }
         Ok(())
@@ -481,6 +546,43 @@ mod vm_tests {
             VmTestCase { input: "{1: 1, 2: 2}[2]", expected: Object::Integer(2) },
             VmTestCase { input: "{1: 1}[0]", expected: Object::Null },
             VmTestCase { input: "{}[0]", expected: Object::Null },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_function_call_without_arguments() {
+        let tests = vec![
+            VmTestCase { input: "let fivePlusTen = fn() { 5 + 10; }; fivePlusTen()", expected: Object::Integer(15) },
+            VmTestCase { 
+                input: "let one = fn() { 1 }; let two = fn() { 2; }; one() + two()",
+                expected: Object::Integer(3) 
+            },
+            VmTestCase { 
+                input: "let a = fn() { 1 }; let b = fn() { a() + 1 }; let c = fn() { b() + 1 }; c()",
+                expected: Object::Integer(3) 
+            },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_function_with_return_statement() {
+        let tests = vec![
+            VmTestCase { input: "let early = fn() { return 99; 100 }; early()", expected: Object::Integer(99) },
+            VmTestCase { input: "let early = fn() { return 99; return 100 }; early()", expected: Object::Integer(99) },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_function_without_return_value() {
+        let tests = vec![
+            VmTestCase { input: "let noReturn = fn() { } noReturn()", expected: Object::Null },
+            VmTestCase { 
+                input: "let noReturn = fn() { }; let noReturnTwo = fn() { noReturn() } noReturn() noReturnTwo()",
+                expected: Object::Null 
+            },
         ];
         run_vm_tests(tests);
     }

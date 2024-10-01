@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hash::{Hash, Hasher}};
 
-use crate::{environment::Environment, ast::{BlockStatement, Identifier}};
+use crate::{ast::{BlockStatement, Identifier}, code::Instructions, environment::Environment};
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Object {
@@ -12,6 +12,7 @@ pub enum Object {
     Error(String),
     Function(Vec<Identifier>, BlockStatement, Environment),
     BuiltinFunction(fn(Vec<Object>) -> Object),
+    CompiledFunction(Instructions),
     Array(Vec<Object>),
     Hash(HashMap<Object, Object>),
 }
@@ -29,6 +30,7 @@ impl Object {
                 let s = params.iter().map(|p| p.value).collect::<Vec<&'static str>>().join(", ");
                 format!("fn({}) {{\n{}\n}}", s, body)
             },
+            Object::CompiledFunction(_) => "compiled function".to_string(),
             Object::BuiltinFunction(_) => "builtin function".to_owned(),
             Object::Array(elements) => {
                 format!("[{}]", elements.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", "))

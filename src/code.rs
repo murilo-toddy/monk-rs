@@ -64,6 +64,9 @@ pub enum Opcode {
     Array = 18,
     Hash = 19,
     Index = 20,
+    Call = 21,
+    Return = 22,
+    ReturnValue = 23,
 }
 
 impl Opcode {
@@ -90,6 +93,9 @@ impl Opcode {
             18 => Some(Opcode::Array),
             19 => Some(Opcode::Hash),
             20 => Some(Opcode::Index),
+            21 => Some(Opcode::Call),
+            22 => Some(Opcode::Return),
+            23 => Some(Opcode::ReturnValue),
             _ => None,
         }
     }
@@ -127,6 +133,9 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::Array => generate_definition("OpArray", vec![2]),
         Opcode::Hash => generate_definition("OpHash", vec![2]),
         Opcode::Index => generate_definition("OpHash", vec![]),
+        Opcode::Call => generate_definition("OpCall", vec![]),
+        Opcode::Return => generate_definition("OpReturn", vec![]),
+        Opcode::ReturnValue => generate_definition("OpReturnValue", vec![]),
     }
 }
 

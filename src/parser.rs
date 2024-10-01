@@ -1,4 +1,4 @@
-use core::fmt;
+use std::fmt;
 
 use crate::lexer::Lexer;
 use crate::token::Token;
