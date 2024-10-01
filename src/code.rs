@@ -63,6 +63,7 @@ pub enum Opcode {
     GetGlobal = 17,
     Array = 18,
     Hash = 19,
+    Index = 20,
 }
 
 impl Opcode {
@@ -88,6 +89,7 @@ impl Opcode {
             17 => Some(Opcode::GetGlobal),
             18 => Some(Opcode::Array),
             19 => Some(Opcode::Hash),
+            20 => Some(Opcode::Index),
             _ => None,
         }
     }
@@ -124,6 +126,7 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::GetGlobal => generate_definition("OpGetGlobal", vec![2]),
         Opcode::Array => generate_definition("OpArray", vec![2]),
         Opcode::Hash => generate_definition("OpHash", vec![2]),
+        Opcode::Index => generate_definition("OpHash", vec![]),
     }
 }
 

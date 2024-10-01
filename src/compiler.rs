@@ -214,7 +214,12 @@ impl Compiler {
                 self.emit(Opcode::Hash, vec![elements_count as i64]);
                 Ok(())
             },
-            Expression::Index { .. } => todo!(),
+            Expression::Index { left, index, .. } => {
+                self.compile_expression(*left)?;
+                self.compile_expression(*index)?;
+                self.emit(Opcode::Index, vec![]);
+                Ok(())
+            },
         }
     }
 
@@ -620,6 +625,65 @@ mod compiler_tests {
                     make(Opcode::Constant, vec![4]),
                     make(Opcode::Constant, vec![5]),
                     make(Opcode::Hash, vec![6]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2 + 3, 4: 5 * 6}",
+                expected_constants: vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                    Object::Integer(6),
+                ],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Add, vec![]),
+                    make(Opcode::Constant, vec![3]),
+                    make(Opcode::Constant, vec![4]),
+                    make(Opcode::Constant, vec![5]),
+                    make(Opcode::Mul, vec![]),
+                    make(Opcode::Hash, vec![4]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "[1, 2, 3][1 + 1]",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2), Object::Integer(3), Object::Integer(1), Object::Integer(1)],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Array, vec![3]),
+                    make(Opcode::Constant, vec![3]),
+                    make(Opcode::Constant, vec![4]),
+                    make(Opcode::Add, vec![]),
+                    make(Opcode::Index, vec![]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2}[2 - 1]",
+                expected_constants: vec![Object::Integer(1), Object::Integer(2), Object::Integer(2), Object::Integer(1)],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Hash, vec![2]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Constant, vec![3]),
+                    make(Opcode::Sub, vec![]),
+                    make(Opcode::Index, vec![]),
                     make(Opcode::Pop, vec![]),
                 ],
             },

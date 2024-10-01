@@ -158,6 +158,30 @@ impl Vm {
         Ok(())
     }
 
+    fn execute_index_operation(&mut self, collection: Option<Object>, index: Option<Object>) -> Result<Object, String> {
+        match collection {
+            Some(Object::Array(array)) => {
+                match index {
+                    Some(Object::Integer(index)) => {
+                        if index < 0 || index as usize >= array.len() {
+                            Ok(Object::Null)
+                        } else {
+                            Ok(array[index as usize].clone())
+                        }
+                    },
+                    _ => Err(format!("expected index to be integer but got {:?}", index)),
+                }
+            },
+            Some(Object::Hash(hash)) => {
+                match index {
+                    Some(object) => Ok(hash.get(&object).cloned().unwrap_or(Object::Null)),
+                    None => Err(format!("could not fetch index")),
+                }
+            },
+            _ => Err(format!("index operation not supported in {:?}", collection)),
+        }
+    }
+
     fn build_array(&mut self, start_index: usize, end_index: usize) -> Result<Object, String> {
         match self.stack[start_index..end_index]
             .into_iter()
@@ -249,6 +273,14 @@ impl Vm {
                         let hash = self.build_hash(self.sp - elements_count, self.sp)?;
                         self.sp -= elements_count;
                         self.push(hash)?;
+                    },
+                    Opcode::Index => {
+                        let index = self.pop();
+                        let collection = self.pop();
+                        match self.execute_index_operation(collection, index) {
+                            Ok(object) => self.push(object)?,
+                            Err(msg) => return Err(msg),
+                        }
                     },
                 };
                 ip += 1;
@@ -432,6 +464,23 @@ mod vm_tests {
                     ])
                 ),
             },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let tests = vec![
+            VmTestCase { input: "[1, 2, 3][1]", expected: Object::Integer(2) },
+            VmTestCase { input: "[1, 2, 3][0 + 2]", expected: Object::Integer(3) },
+            VmTestCase { input: "[[1, 1, 1]][0][0]", expected: Object::Integer(1) },
+            VmTestCase { input: "[][0]", expected: Object::Null },
+            VmTestCase { input: "[1, 2, 3][99]", expected: Object::Null },
+            VmTestCase { input: "[1][-1]", expected: Object::Null },
+            VmTestCase { input: "{1: 1, 2: 2}[1]", expected: Object::Integer(1) },
+            VmTestCase { input: "{1: 1, 2: 2}[2]", expected: Object::Integer(2) },
+            VmTestCase { input: "{1: 1}[0]", expected: Object::Null },
+            VmTestCase { input: "{}[0]", expected: Object::Null },
         ];
         run_vm_tests(tests);
     }
