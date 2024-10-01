@@ -55,7 +55,7 @@ impl Evaluator {
                 if self.is_error(&right_eval) {
                     return right_eval;
                 }
-                if self.env.get(&value).is_some() {
+                if self.env.get(value).is_some() {
                     self.env.set(value, right_eval.clone());
                     return right_eval;
                 } else {
@@ -81,7 +81,7 @@ impl Evaluator {
                     match left_eval {
                         Object::Array(mut arr) => {
                             if let Object::Integer(idx) = index_eval {
-                                if arr.len() == 0 || idx < 0 || idx > (arr.len() as i64) - 1 {
+                                if arr.is_empty() || idx < 0 || idx > (arr.len() as i64) - 1 {
                                     return Object::Error(format!("index {} out of bounds for array [{}]", 
                                         idx, arr.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", ")));
                                 }
@@ -261,7 +261,7 @@ impl Evaluator {
         match left {
             Object::Array(elements) => {
                 if let Object::Integer(index) = index {
-                    if elements.len() == 0 || index < 0 || index > elements.len() as i64 - 1 {
+                    if elements.is_empty() || index < 0 || index > elements.len() as i64 - 1 {
                         return Object::Null;
                     }
                     return elements[index as usize].clone();
@@ -294,7 +294,7 @@ impl Evaluator {
     fn evaluate_expression(&mut self, expression: Expression) -> Object {
         match expression {
             Expression::Identifier { value, .. } => {
-                self.env.get(&value)
+                self.env.get(value)
                     .or_else(|| self.builtin.get_function_object(&value))
                     .unwrap_or(Object::Error(format!("identifier not found: {}", value)))
             },

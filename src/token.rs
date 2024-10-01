@@ -81,9 +81,9 @@ impl Token {
         match self {
             Token::Illegal(v) => Box::leak(v.to_string().into_boxed_str()),
             Token::Eof => "\0",
-            Token::Identifier(v) => *v,
+            Token::Identifier(v) => v,
             Token::Integer(v) => Box::leak(v.to_string().into_boxed_str()),
-            Token::String(v) => *v,
+            Token::String(v) => v,
             Token::Assign => "=",
             Token::Plus => "+",
             Token::Minus => "-",

@@ -6,11 +6,11 @@ fn format_instruction(def: Definition, operands: Vec<i64>) -> String {
         return format!("ERROR: operand len {} does not match definition {} for {}",
                        operands.len(), operand_count, def.name);
     }
-    return match operand_count {
+    match operand_count {
         0 => def.name.to_owned(),
         1 => format!("{} {}", def.name, operands[0]),
         _ => format!("ERROR: unhandled operand count for {}", def.name),
-    };
+    }
 }
 
 pub fn disassemble(instructions: &Instructions) -> String {
@@ -27,7 +27,7 @@ pub fn disassemble(instructions: &Instructions) -> String {
             continue;
         }
     }
-    return out;
+    out
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,16 +161,16 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
 }
 
 pub fn lookup(op: u8) -> Option<Definition> {
-    Opcode::from(op).map(|opcode| get_definition(&opcode)).flatten()
+    Opcode::from(op).and_then(|opcode| get_definition(&opcode))
 }
 
 pub fn make(op: Opcode, operands: Vec<i64>) -> Vec<u8> {
-    return match get_definition(&op) {
+    match get_definition(&op) {
         Some(def) => 
             vec![op as u8].into_iter().chain(
                 operands
                     .into_iter()
-                    .zip(def.operand_widths.into_iter())
+                    .zip(def.operand_widths)
                     .flat_map(|(operand, width)|
                         match width {
                             2 => (operand as i16).to_be_bytes().to_vec(),
@@ -178,8 +178,8 @@ pub fn make(op: Opcode, operands: Vec<i64>) -> Vec<u8> {
                         }
                     ).collect::<Vec<u8>>()
             ).collect(),
-        None => return vec![],
-    };
+        None => vec![],
+    }
 }
 
 fn read_operands(def: &Definition, instructions: Instructions) -> (Vec<i64>, i64) {
@@ -197,7 +197,7 @@ fn read_operands(def: &Definition, instructions: Instructions) -> (Vec<i64>, i64
         }
         offset += width;
     }
-    return (operands, offset as i64);
+    (operands, offset as i64)
 }
 
 #[cfg(test)]

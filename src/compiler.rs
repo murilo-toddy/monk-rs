@@ -25,7 +25,7 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Compiler {
-        return Compiler {
+        Compiler {
             instructions: vec![],
             constants: vec![],
 
@@ -33,7 +33,7 @@ impl Compiler {
             previous_instruction: None,
 
             symbol_table: SymbolTable::new(),
-        };
+        }
     }
 
     pub fn reset(&mut self) -> Compiler {
@@ -85,20 +85,20 @@ impl Compiler {
 
     fn add_constant(&mut self, obj: Object) -> i64 {
         self.constants.push(obj);
-        return (self.constants.len() - 1) as i64;
+        (self.constants.len() - 1) as i64
     }
 
     fn add_instruction(&mut self, instruction: Vec<u8>) -> usize {
         let new_instruction_idx = self.instructions.len();
         self.instructions.extend(instruction);
-        return new_instruction_idx;
+        new_instruction_idx
     }
 
     fn emit(&mut self, op: Opcode, operands: Vec<i64>) -> usize {
         let instruction = make(op.clone(), operands);
         let position = self.add_instruction(instruction);
         self.set_last_instruction(op, position);
-        return position;
+        position
     }
 
     fn compile_expression(&mut self, expression: Expression) -> Result<(), String> {
@@ -135,7 +135,7 @@ impl Compiler {
                     "!" => self.emit(Opcode::Bang, vec![]),
                     _ => return Err(format!("unknown prefix operator {}", operator)),
                 };
-                return Ok(());
+                Ok(())
             },
             Expression::Infix { operator, left, right, .. } => {
                 if operator == "<" {
@@ -156,7 +156,7 @@ impl Compiler {
                     ">" => self.emit(Opcode::GreaterThan, vec![]),
                     _ => return Err(format!("unknown infix operator {}", operator)),
                 };
-                return Ok(());
+                Ok(())
             },
             Expression::If { conditions, alternative, .. } => {
                 // TODO: add support for else if
@@ -185,7 +185,7 @@ impl Compiler {
                 let after_alternative_pos = self.instructions.len();
                 self.change_operand(jump_pos, after_alternative_pos as i64);
 
-                return Ok(());
+                Ok(())
             },
             Expression::Function { .. } => todo!(),
             Expression::While { .. } => todo!(),
@@ -218,7 +218,7 @@ impl Compiler {
             Statement::Expression { expression, .. } => {
                 expression.map_or(Ok(()), |e| self.compile_expression(e))?;
                 self.emit(Opcode::Pop, vec![]);
-                return Ok(())
+                Ok(())
             },
         }
     }
@@ -231,10 +231,16 @@ impl Compiler {
     }
 
     pub fn bytecode(self) -> Bytecode {
-        return Bytecode {
+        Bytecode {
             instructions: self.instructions,
             constants: self.constants,
-        };
+        }
+    }
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

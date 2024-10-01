@@ -4,7 +4,7 @@ use crate::object::Object;
 
 type BuiltinFunction = fn(Vec<Object>) -> Object;
 
-fn validate_args(args: &Vec<Object>, expected_args: usize, func: &str) -> Option<Object> {
+fn validate_args(args: &[Object], expected_args: usize, func: &str) -> Option<Object> {
     if args.len() != expected_args {
         return Some(Object::Error(
             format!("wrong number of arguments on function `{}`. got={}, want={}", func, args.len(), expected_args)
@@ -23,7 +23,7 @@ fn len_function(args: Vec<Object>) -> Object {
         return error;
     }
     match args[0] {
-        Object::String(ref value) => Object::Integer(value.len() as i64),
+        Object::String(value) => Object::Integer(value.len() as i64),
         Object::Array(ref elems) => Object::Integer(elems.len() as i64),
         _ => Object::Error(format!("argument {} not supported by `len`", args[0].inspect()))
     }

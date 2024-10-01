@@ -542,7 +542,7 @@ impl<'a> Parser<'a> {
         
         Some(Expression::Prefix {
             token: current_token.clone(),
-            operator: format!("{}", current_token.as_string()),
+            operator: current_token.as_string().to_string(),
             right: Box::new(self.parse_expression(Precedence::Prefix)?),
         })
     }
@@ -554,7 +554,7 @@ impl<'a> Parser<'a> {
 
         Some(Expression::Infix {
             token: current_token.clone(),
-            operator: Box::leak(format!("{}", current_token.as_string()).into_boxed_str()),
+            operator: Box::leak(current_token.as_string().to_string().into_boxed_str()),
             left: Box::new(left),
             right: Box::new(self.parse_expression(precedence).unwrap()),
         })

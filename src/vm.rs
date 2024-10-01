@@ -39,7 +39,7 @@ impl Vm {
     }
 
     pub fn last_popped_elem(&mut self) -> Option<Object> {
-        return self.stack[self.sp].clone();
+        self.stack[self.sp].clone()
     }
 
     pub fn stack_top(&mut self) -> Option<Object> {
@@ -55,16 +55,16 @@ impl Vm {
         }
         self.stack[self.sp] = Some(obj);
         self.sp += 1;
-        return Ok(())
+        Ok(())
     }
 
     fn pop(&mut self) -> Option<Object> {
-        if self.sp <= 0 {
+        if self.sp == 0 {
             return None
         }
         let obj = self.stack[self.sp - 1].clone();
         self.sp -= 1;
-        return obj;
+        obj
     }
 
     fn execute_binary_integer_operation(&mut self, op: Opcode, left: i64, right: i64) -> Result<(), String> {
@@ -200,6 +200,12 @@ impl Vm {
             }
         }
         Ok(())
+    }
+}
+
+impl Default for Vm {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
