@@ -1,21 +1,24 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-enum SymbolScope {
+pub enum SymbolScope {
     Global,
+    Local,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Symbol {
     name: &'static str,
-    scope: SymbolScope,
+    pub scope: SymbolScope,
     pub index: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SymbolTable {
     store: HashMap<&'static str, Symbol>,
-    definition_count: usize,
+    pub definition_count: usize,
+
+    pub outer: Option<Rc<RefCell<SymbolTable>>>,
 }
 
 impl SymbolTable {
@@ -23,14 +26,29 @@ impl SymbolTable {
         SymbolTable {
             store: HashMap::new(),
             definition_count: 0,
+
+            outer: None,
+        }
+    }
+
+    pub fn enclosing(table: Rc<RefCell<SymbolTable>>) -> SymbolTable {
+        SymbolTable {
+            store: HashMap::new(),
+            definition_count: 0,
+
+            outer: Some(table),
         }
     }
 
     pub fn define(&mut self, identifier: &'static str) -> Symbol {
+        let scope = match self.outer {
+            Some(_) => SymbolScope::Local,
+            None => SymbolScope::Global,
+        };
         let symbol = Symbol {
             name: identifier,
-            scope: SymbolScope::Global,
             index: self.definition_count,
+            scope,
         };
         self.store.insert(identifier, symbol.clone());
         self.definition_count += 1;
@@ -38,7 +56,13 @@ impl SymbolTable {
     }
 
     pub fn resolve(&mut self, identifier: &'static str) -> Option<Symbol> {
-        self.store.get(identifier).cloned()
+        match self.store.get(identifier).cloned() {
+            Some(symbol) => Some(symbol),
+            None => match self.outer.as_ref() {
+                Some(table) => table.borrow_mut().resolve(identifier),
+                None => None,
+            }
+        }
     }
 }
 
@@ -57,12 +81,28 @@ mod symbol_tests {
         let expected = HashMap::from([
             ("a", Symbol { name: "a", scope: SymbolScope::Global, index: 0 }),
             ("b", Symbol { name: "b", scope: SymbolScope::Global, index: 1 }),
+            ("c", Symbol { name: "c", scope: SymbolScope::Local, index: 0 }),
+            ("d", Symbol { name: "d", scope: SymbolScope::Local, index: 1 }),
+            ("e", Symbol { name: "e", scope: SymbolScope::Local, index: 0 }),
+            ("f", Symbol { name: "f", scope: SymbolScope::Local, index: 1 }),
         ]);
-        let mut table = SymbolTable::new();
-        let a = table.define("a");
+        let mut global = SymbolTable::new();
+        let a = global.define("a");
         assert_eq!(a, expected["a"], "expected a={:?}, got={:?}", expected["a"], a);
-        let b = table.define("b");
+        let b = global.define("b");
         assert_eq!(b, expected["b"], "expected b={:?}, got={:?}", expected["b"], b);
+
+        let mut first_local = SymbolTable::enclosing(Rc::from(RefCell::new(global)));
+        let c = first_local.define("c");
+        assert_eq!(c, expected["c"], "expected c={:?}, got={:?}", expected["c"], c);
+        let b = first_local.define("d");
+        assert_eq!(b, expected["d"], "expected b={:?}, got={:?}", expected["b"], b);
+
+        let mut second_local = SymbolTable::enclosing(Rc::from(RefCell::new(first_local)));
+        let e = second_local.define("e");
+        assert_eq!(e, expected["e"], "expected c={:?}, got={:?}", expected["e"], e);
+        let f = second_local.define("f");
+        assert_eq!(f, expected["f"], "expected b={:?}, got={:?}", expected["f"], f);
     }
 
     #[test]
@@ -81,6 +121,78 @@ mod symbol_tests {
             match result {
                 Some(result) => assert_eq!(result, symbol, "expected {} to resolve to {:?} but got {:?}", symbol.name, symbol, result),
                 None => panic!("name {} not resolvable", symbol.name),
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_local() {
+        let mut global = SymbolTable::new();
+        global.define("a");
+        global.define("b");
+
+        let mut local = SymbolTable::enclosing(Rc::from(RefCell::new(global)));
+        local.define("c");
+        local.define("d");
+
+        let expected = vec![
+            Symbol { name: "a", scope: SymbolScope::Global, index: 0 },
+            Symbol { name: "b", scope: SymbolScope::Global, index: 1 },
+            Symbol { name: "c", scope: SymbolScope::Local, index: 0 },
+            Symbol { name: "d", scope: SymbolScope::Local, index: 1 },
+        ];
+
+        for symbol in expected {
+            let result = local.resolve(symbol.name);
+            match result {
+                Some(result) => assert_eq!(result, symbol, "expected {} to resolve to {:?} but got {:?}", symbol.name, symbol, result),
+                None => panic!("name {} not resolvable", symbol.name),
+            }
+        }
+    }
+
+    #[test]
+    fn test_nested_resolve_local() {
+        let mut global = SymbolTable::new();
+        global.define("a");
+        global.define("b");
+
+        let mut first_local = SymbolTable::enclosing(Rc::from(RefCell::new(global)));
+        first_local.define("c");
+        first_local.define("d");
+
+        let mut second_local = SymbolTable::enclosing(Rc::from(RefCell::new(first_local.clone())));
+        second_local.define("e");
+        second_local.define("f");
+
+        let tests = vec![
+            (
+                first_local,
+                vec![
+                    Symbol { name: "a", scope: SymbolScope::Global, index: 0 },
+                    Symbol { name: "b", scope: SymbolScope::Global, index: 1 },
+                    Symbol { name: "c", scope: SymbolScope::Local, index: 0 },
+                    Symbol { name: "d", scope: SymbolScope::Local, index: 1 },
+                ],
+            ),
+            (
+                second_local,
+                vec![
+                    Symbol { name: "a", scope: SymbolScope::Global, index: 0 },
+                    Symbol { name: "b", scope: SymbolScope::Global, index: 1 },
+                    Symbol { name: "e", scope: SymbolScope::Local, index: 0 },
+                    Symbol { name: "f", scope: SymbolScope::Local, index: 1 },
+                ],
+            ),
+        ];
+
+        for (mut table, symbols) in tests {
+            for symbol in symbols {
+                let result = table.resolve(symbol.name);
+                match result {
+                    Some(result) => assert_eq!(result, symbol, "expected {} to resolve to {:?} but got {:?}", symbol.name, symbol, result),
+                    None => panic!("name {} not resolvable", symbol.name),
+                }
             }
         }
     }

@@ -34,7 +34,7 @@ impl Vm {
     }
 
     pub fn reset(&mut self, bytecode: Bytecode) -> Vm {
-        let main_frame = Frame::new(bytecode.instructions);
+        let main_frame = Frame::new(bytecode.instructions, 0);
         let mut frames = vec![None; MAX_FRAMES];
         frames[0] = Some(main_frame);
         Vm {
@@ -66,7 +66,7 @@ impl Vm {
 
     fn pop_frame(&mut self) -> Option<Frame> {
         self.frame_index -= 1;
-        self.frames.pop().flatten()
+        self.frames[self.frame_index].clone()
     }
 
     pub fn last_popped_elem(&mut self) -> Option<Object> {
@@ -327,23 +327,54 @@ impl Vm {
                     },
                     Opcode::Call => {
                         match &self.stack[self.sp - 1] {
-                            Some(Object::CompiledFunction(function)) => {
-                                self.push_frame(Frame::new(function.clone()));
+                            Some(Object::CompiledFunction { function, locals_count }) => {
+                                let frame = Frame::new(function.clone(), self.sp);
+                                self.sp = frame.base_pointer + locals_count;
+                                self.push_frame(frame);
                             },
                             _ => return Err(format!("attempting to call non-function {:?}", self.stack[self.sp - 1])),
                         };
                     }, 
                     Opcode::Return => {
-                        self.pop_frame();
-                        self.pop();
+                        match self.pop_frame() {
+                            Some(frame) => self.sp = frame.base_pointer - 1,
+                            None => return Err("attempting to return from no function call".to_string()),
+                        };
                         self.push(Object::Null)?;
                     },
                     Opcode::ReturnValue => {
                         let return_value = self.pop();
-                        self.pop_frame();
-                        self.pop();
+                        match self.pop_frame() {
+                            Some(frame) => self.sp = frame.base_pointer - 1,
+                            None => return Err("attempting to return from no function call".to_string()),
+                        };
                         if let Some(value) = return_value {
                             self.push(value)?;
+                        }
+                    },
+                    Opcode::SetLocal => {
+                        let index = instructions[ip + 1] as usize;
+                        match self.current_frame() {
+                            Some(frame) => {
+                                frame.ip += 1;
+                                let stack_index = frame.base_pointer + index;
+                                self.stack[stack_index] = self.pop();
+                            }
+                            None => return Err("vm has no current frame".to_string()),
+                        }
+                    },
+                    Opcode::GetLocal => {
+                        match self.current_frame() {
+                            Some(frame) => {
+                                let index = instructions[ip + 1] as usize;
+                                frame.ip += 1;
+                                let stack_index = frame.base_pointer + index;
+                                match &self.stack[stack_index] {
+                                    Some(object) => self.push(object.to_owned())?,
+                                    None => return Err("could not find local binding to push to the stack".to_string()),
+                                }
+                            }
+                            None => return Err("vm has no current frame".to_string()),
                         }
                     },
                 };
@@ -370,9 +401,8 @@ mod vm_tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::{ast::Program, lexer::Lexer, parser::Parser, compiler::Compiler};
-
-    struct VmTestCase {
+    use crate::{ast::Program, compiler::Compiler, lexer::Lexer, parser::Parser};
+struct VmTestCase {
         input: &'static str,
         expected: Object,
     }
@@ -581,6 +611,76 @@ mod vm_tests {
                 input: "let noReturn = fn() { }; let noReturnTwo = fn() { noReturn() } noReturn() noReturnTwo()",
                 expected: Object::Null 
             },
+        ];
+        run_vm_tests(tests);
+    }
+    
+    #[test]
+    fn test_calling_functions_with_bindings() {
+        let tests = vec![
+            VmTestCase { 
+                input: "let one = fn() { let one = 1; one }; one()",
+                expected: Object::Integer(1),
+            },
+            VmTestCase { 
+                input: "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; }; oneAndTwo()",
+                expected: Object::Integer(3),
+            },
+            VmTestCase { 
+                input: "
+                    let oneAndTwo = fn() {
+                        let one = 1;
+                        let two = 2;
+                        one + two;
+                    };
+                    let threeAndFour = fn() {
+                        let three = 3;
+                        let four = 4;
+                        three + four;
+                    };
+                    oneAndTwo() + threeAndFour();
+                ",
+                expected: Object::Integer(10),
+            },
+            VmTestCase { 
+                input: "
+                    let firstFoobar = fn() { 
+                        let foobar = 50;
+                        foobar;
+                    }; 
+                    let secondFoobar = fn() { 
+                        let foobar = 100; 
+                        foobar; 
+                    }; 
+                    firstFoobar() + secondFoobar();
+                ",
+                expected: Object::Integer(150),
+            },
+            VmTestCase { 
+                input: "
+                    let globalSeed = 50;
+                    let minusOne = fn() { 
+                        let num = 1; 
+                        globalSeed - num; 
+                    } 
+                    let minusTwo = fn() { 
+                        let num = 2; 
+                        globalSeed - num;
+                    } 
+                    minusOne() + minusTwo();
+                ",
+                expected: Object::Integer(97),
+            },
+            VmTestCase {
+                input: "
+                    let returnsOneReturner = fn() {
+                        let returnsOne = fn() { 1; };
+                        returnsOne;
+                    }
+                    returnsOneReturner()()
+                ",
+                expected: Object::Integer(1),
+            }
         ];
         run_vm_tests(tests);
     }

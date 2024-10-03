@@ -67,6 +67,8 @@ pub enum Opcode {
     Call = 21,
     Return = 22,
     ReturnValue = 23,
+    GetLocal = 24,
+    SetLocal = 25,
 }
 
 impl Opcode {
@@ -96,6 +98,8 @@ impl Opcode {
             21 => Some(Opcode::Call),
             22 => Some(Opcode::Return),
             23 => Some(Opcode::ReturnValue),
+            24 => Some(Opcode::GetLocal),
+            25 => Some(Opcode::SetLocal),
             _ => None,
         }
     }
@@ -136,6 +140,8 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::Call => generate_definition("OpCall", vec![]),
         Opcode::Return => generate_definition("OpReturn", vec![]),
         Opcode::ReturnValue => generate_definition("OpReturnValue", vec![]),
+        Opcode::GetLocal => generate_definition("OpGetLocal", vec![1]),
+        Opcode::SetLocal => generate_definition("OpSetLocal", vec![1]),
     }
 }
 
@@ -152,6 +158,7 @@ pub fn make(op: Opcode, operands: Vec<i64>) -> Vec<u8> {
                     .into_iter()
                     .zip(def.operand_widths)
                     .flat_map(|(operand, width)| match width {
+                        1 => (operand as u8).to_be_bytes().to_vec(),
                         2 => (operand as i16).to_be_bytes().to_vec(),
                         _ => vec![],
                     })
@@ -168,10 +175,8 @@ fn read_operands(def: &Definition, instructions: Instructions) -> (Vec<i64>, i64
 
     for (i, width) in def.operand_widths.iter().enumerate() {
         match width {
-            2 => {
-                operands[i] =
-                    u16::from_be_bytes(instructions[offset..offset + 2].try_into().unwrap()) as i64;
-            }
+            1 => operands[i] = instructions[offset] as i64,
+            2 => operands[i] = u16::from_be_bytes(instructions[offset..offset + 2].try_into().unwrap()) as i64,
             _ => {}
         }
         offset += width;
@@ -189,11 +194,15 @@ mod code_tests {
             make(Opcode::Add, vec![]),
             make(Opcode::Constant, vec![2]),
             make(Opcode::Constant, vec![65535]),
+            make(Opcode::GetLocal, vec![1]),
+            make(Opcode::Pop, vec![]),
         ];
 
         let expected = "0000 OpAdd
 0001 OpConstant 2
 0004 OpConstant 65535
+0007 OpGetLocal 1
+0009 OpPop
 ";
 
         let instructions_concat: Instructions = instructions.into_iter().flatten().collect();
@@ -209,7 +218,10 @@ mod code_tests {
 
     #[test]
     fn test_read_operands() {
-        let tests = vec![(Opcode::Constant, vec![65535], 2)];
+        let tests = vec![
+            (Opcode::Constant, vec![65535], 2),
+            (Opcode::GetLocal, vec![255], 1)
+        ];
         for (opcode, operands, bytes_read) in tests {
             let op = opcode.clone() as u8;
             let def = lookup(op).expect(format!("definition not found for {:?}", op).as_str());
@@ -237,6 +249,7 @@ mod code_tests {
                 vec![Opcode::Constant as u8, 255 as u8, 254 as u8],
             ),
             (Opcode::Add, vec![], vec![Opcode::Add as u8]),
+            (Opcode::GetLocal, vec![255], vec![Opcode::GetLocal as u8, 255]),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, operands);

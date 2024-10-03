@@ -12,7 +12,10 @@ pub enum Object {
     Error(String),
     Function(Vec<Identifier>, BlockStatement, Environment),
     BuiltinFunction(fn(Vec<Object>) -> Object),
-    CompiledFunction(Instructions),
+    CompiledFunction {
+        function: Instructions,
+        locals_count: usize,
+    },
     Array(Vec<Object>),
     Hash(HashMap<Object, Object>),
 }
@@ -30,7 +33,7 @@ impl Object {
                 let s = params.iter().map(|p| p.value).collect::<Vec<&'static str>>().join(", ");
                 format!("fn({}) {{\n{}\n}}", s, body)
             },
-            Object::CompiledFunction(_) => "compiled function".to_string(),
+            Object::CompiledFunction { .. } => "compiled function".to_string(),
             Object::BuiltinFunction(_) => "builtin function".to_owned(),
             Object::Array(elements) => {
                 format!("[{}]", elements.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", "))
