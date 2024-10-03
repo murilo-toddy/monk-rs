@@ -239,6 +239,21 @@ impl Vm {
             }
     }
 
+    pub fn call_function(&mut self, arguments_count: usize) -> Result<(), String> {
+        match &self.stack[self.sp - 1 - arguments_count] {
+            Some(Object::CompiledFunction { function, parameters_count, locals_count }) => {
+                if arguments_count != *parameters_count {
+                    return Err(format!("wrong number of arguments: expected {} but got {}", *parameters_count, arguments_count));
+                }
+                let frame = Frame::new(function.clone(), self.sp - arguments_count);
+                self.sp = frame.base_pointer + locals_count;
+                self.push_frame(frame);
+            },
+            _ => return Err(format!("attempting to call non-function {:?}", self.stack[self.sp - 1])),
+        };
+        Ok(())
+    }
+
     fn ip_add(&mut self, value: i64) {
         if let Some(frame) = self.current_frame() { 
             frame.ip += value; 
@@ -326,14 +341,11 @@ impl Vm {
                         }
                     },
                     Opcode::Call => {
-                        match &self.stack[self.sp - 1] {
-                            Some(Object::CompiledFunction { function, locals_count }) => {
-                                let frame = Frame::new(function.clone(), self.sp);
-                                self.sp = frame.base_pointer + locals_count;
-                                self.push_frame(frame);
-                            },
-                            _ => return Err(format!("attempting to call non-function {:?}", self.stack[self.sp - 1])),
-                        };
+                        let arguments_count = instructions[ip + 1] as usize;
+                        if let Some(frame) = self.current_frame() {
+                            frame.ip += 1;
+                        }
+                        self.call_function(arguments_count)?;
                     }, 
                     Opcode::Return => {
                         match self.pop_frame() {
@@ -683,5 +695,53 @@ struct VmTestCase {
             }
         ];
         run_vm_tests(tests);
+    }
+    
+    #[test]
+    fn test_calling_functions_with_arguments_and_bindings() {
+        let tests = vec![
+            VmTestCase { 
+                input: "let identify = fn(a) { a }; identify(4);",
+                expected: Object::Integer(4),
+            },
+            VmTestCase { 
+                input: "let sum = fn(a, b) { let c = a + b; c; }; sum(1, 2);",
+                expected: Object::Integer(3),
+            },
+            VmTestCase {
+                input: "let sum = fn(a, b) { let c = a + b; c; } sum(1, 2) + sum(3, 4)",
+                expected: Object::Integer(10),
+            },
+            VmTestCase {
+                input: "
+                    let sum = fn(a, b) { let c = a + b; c; }
+                    let outer = fn() { sum(1, 2) + sum(3, 4); }
+                    outer();
+                ",
+                expected: Object::Integer(10),
+            },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    // TODO for crying out loud this should be a compiler error!!!!
+    fn test_calling_functions_with_wrong_arguments() {
+        let tests: Vec<(&'static str, Result<(), String>)> = vec![
+            ("fn() { 1; }(1)", Err::<(), String>("wrong number of arguments: expected 0 but got 1".to_string())),
+            ("fn(a) { }()", Err::<(), String>("wrong number of arguments: expected 1 but got 0".to_string())),
+            ("fn(a, b) { a + b; }(1)", Err::<(), String>("wrong number of arguments: expected 2 but got 1".to_string())),
+        ];
+        for (input, expected) in tests {
+            let mut compiler = Compiler::new();
+            let program = parse(input);
+            if let Err(msg) = compiler.compile(program) {
+                panic!("compiler error {}", msg);
+            }
+            let mut vm = Vm::new();
+            let mut vm = vm.reset(compiler.bytecode());
+            let result = vm.run();
+            assert_eq!(expected, result, "expected {:?} to equal {:?} in test {}", expected, result, input);
+        }
     }
 }

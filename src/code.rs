@@ -137,7 +137,7 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::Array => generate_definition("OpArray", vec![2]),
         Opcode::Hash => generate_definition("OpHash", vec![2]),
         Opcode::Index => generate_definition("OpHash", vec![]),
-        Opcode::Call => generate_definition("OpCall", vec![]),
+        Opcode::Call => generate_definition("OpCall", vec![1]),
         Opcode::Return => generate_definition("OpReturn", vec![]),
         Opcode::ReturnValue => generate_definition("OpReturnValue", vec![]),
         Opcode::GetLocal => generate_definition("OpGetLocal", vec![1]),

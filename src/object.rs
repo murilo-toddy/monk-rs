@@ -15,6 +15,7 @@ pub enum Object {
     CompiledFunction {
         function: Instructions,
         locals_count: usize,
+        parameters_count: usize,
     },
     Array(Vec<Object>),
     Hash(HashMap<Object, Object>),

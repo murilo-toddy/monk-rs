@@ -260,8 +260,12 @@ impl Compiler {
 
                 Ok(())
             },
-            Expression::Function { body, .. } => {
+            Expression::Function { body, arguments, .. } => {
                 self.enter_scope();
+                let parameters_count = arguments.len();
+                for argument in arguments {
+                    self.symbol_table.borrow_mut().define(argument.value);
+                }
                 self.compile_block_statement(body)?;
                 self.replace_last_pop_with(Opcode::ReturnValue);
                 if !self.is_last_instruction(Opcode::ReturnValue) {
@@ -271,6 +275,7 @@ impl Compiler {
                 let instructions = self.leave_scope()?;
                 let function_index = self.add_constant(Object::CompiledFunction {
                         function: instructions,
+                        parameters_count,
                         locals_count,
                 });
                 self.emit(Opcode::Constant, vec![function_index]);
@@ -278,9 +283,13 @@ impl Compiler {
             },
             Expression::While { .. } => todo!(),
             Expression::For { .. } => todo!(),
-            Expression::Call { function, .. } => {
+            Expression::Call { function, arguments, .. } => {
                 self.compile_expression(*function)?;
-                self.emit(Opcode::Call, vec![]);
+                let arguments_count = arguments.len() as i64;
+                for argument in arguments {
+                    self.compile_expression(argument)?;
+                }
+                self.emit(Opcode::Call, vec![arguments_count]);
                 Ok(())
             },
             Expression::Array { elements, .. } => {
@@ -379,7 +388,9 @@ mod compiler_tests {
         for test in tests {
             let mut compiler = Compiler::new();
             let program = parse(test.input);
-            assert!(compiler.compile(program).is_ok());
+            if let Err(msg) = compiler.compile(program) {
+                panic!("unable to compile program {}: {}", test.input, msg);
+            }
             let bytecode = compiler.bytecode();
 
             let exp_concat: Instructions = test.expected_instructions.into_iter().flatten().collect();
@@ -821,6 +832,7 @@ mod compiler_tests {
                             make(Opcode::Add, vec![]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 0,
                     },
                 ],
@@ -841,6 +853,7 @@ mod compiler_tests {
                             make(Opcode::Add, vec![]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 0,
                     }
                 ],
@@ -854,6 +867,7 @@ mod compiler_tests {
                 expected_constants: vec![
                     Object::CompiledFunction {
                         function: make(Opcode::Return, vec![]),
+                        parameters_count: 0,
                         locals_count: 0,
                     }
                 ],
@@ -867,6 +881,7 @@ mod compiler_tests {
                 expected_constants: vec![
                     Object::CompiledFunction {
                         function: make(Opcode::Return, vec![]),
+                        parameters_count: 0,
                         locals_count: 0,
                     }
                 ],
@@ -887,6 +902,7 @@ mod compiler_tests {
                             make(Opcode::Constant, vec![1]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 0,
                     }
                 ],
@@ -904,12 +920,13 @@ mod compiler_tests {
                             make(Opcode::Constant, vec![0]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 0,
                     }
                 ],
                 expected_instructions: vec![
                     make(Opcode::Constant, vec![1]),
-                    make(Opcode::Call, vec![]),
+                    make(Opcode::Call, vec![0]),
                     make(Opcode::Pop, vec![]),
                 ],
             },
@@ -922,6 +939,7 @@ mod compiler_tests {
                             make(Opcode::Constant, vec![0]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 0,
                     }
                 ],
@@ -929,7 +947,59 @@ mod compiler_tests {
                     make(Opcode::Constant, vec![1]),
                     make(Opcode::SetGlobal, vec![0]),
                     make(Opcode::GetGlobal, vec![0]),
-                    make(Opcode::Call, vec![]),
+                    make(Opcode::Call, vec![0]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "let oneArg = fn(a) { a; }; oneArg(24)",
+                expected_constants: vec![
+                    Object::CompiledFunction {
+                        function: vec![
+                            make(Opcode::GetLocal, vec![0]),
+                            make(Opcode::ReturnValue, vec![]),
+                        ].into_iter().flatten().collect(),
+                        parameters_count: 1,
+                        locals_count: 1,
+                    },
+                    Object::Integer(24),
+                ],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::SetGlobal, vec![0]),
+                    make(Opcode::GetGlobal, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Call, vec![1]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "let manyArg = fn(a, b, c) { a; b; c; }; manyArg(24, 25, 26)",
+                expected_constants: vec![
+                    Object::CompiledFunction {
+                        function: vec![
+                            make(Opcode::GetLocal, vec![0]),
+                            make(Opcode::Pop, vec![]),
+                            make(Opcode::GetLocal, vec![1]),
+                            make(Opcode::Pop, vec![]),
+                            make(Opcode::GetLocal, vec![2]),
+                            make(Opcode::ReturnValue, vec![]),
+                        ].into_iter().flatten().collect(),
+                        parameters_count: 3,
+                        locals_count: 3,
+                    },
+                    Object::Integer(24),
+                    Object::Integer(25),
+                    Object::Integer(26),
+                ],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::SetGlobal, vec![0]),
+                    make(Opcode::GetGlobal, vec![0]),
+                    make(Opcode::Constant, vec![1]),
+                    make(Opcode::Constant, vec![2]),
+                    make(Opcode::Constant, vec![3]),
+                    make(Opcode::Call, vec![3]),
                     make(Opcode::Pop, vec![]),
                 ],
             },
@@ -949,6 +1019,7 @@ mod compiler_tests {
                             make(Opcode::GetGlobal, vec![0]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 0,
                     }
                 ],
@@ -970,6 +1041,7 @@ mod compiler_tests {
                             make(Opcode::GetLocal, vec![0]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 1,
                     },
                 ],
@@ -994,6 +1066,7 @@ mod compiler_tests {
                             make(Opcode::Add, vec![]),
                             make(Opcode::ReturnValue, vec![]),
                         ].into_iter().flatten().collect(),
+                        parameters_count: 0,
                         locals_count: 2,
                     },
                 ],
