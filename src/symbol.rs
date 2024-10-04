@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SymbolScope {
+    Builtin,
     Global,
     Local,
 }
@@ -38,6 +39,12 @@ impl SymbolTable {
 
             outer: Some(table),
         }
+    }
+
+    pub fn define_builtin(&mut self, index: usize, name: &'static str) -> Symbol {
+        let symbol = Symbol { name, index, scope: SymbolScope::Builtin };
+        self.store.insert(name, symbol.clone());
+        symbol
     }
 
     pub fn define(&mut self, identifier: &'static str) -> Symbol {
@@ -192,6 +199,33 @@ mod symbol_tests {
                 match result {
                     Some(result) => assert_eq!(result, symbol, "expected {} to resolve to {:?} but got {:?}", symbol.name, symbol, result),
                     None => panic!("name {} not resolvable", symbol.name),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_define_resolve_builtins() {
+        let global = Rc::new(RefCell::from(SymbolTable::new()));
+        let first_local = Rc::new(RefCell::from(SymbolTable::enclosing(Rc::clone(&global))));
+        let second_local = Rc::new(RefCell::from(SymbolTable::enclosing(Rc::clone(&first_local))));
+
+        let expected = [
+            Symbol { name: "a", scope: SymbolScope::Builtin, index: 0 },
+            Symbol { name: "c", scope: SymbolScope::Builtin, index: 1 },
+            Symbol { name: "e", scope: SymbolScope::Builtin, index: 2 },
+            Symbol { name: "f", scope: SymbolScope::Builtin, index: 3 },
+        ];
+
+        expected.iter().enumerate().for_each(|(i, s)| {
+            global.borrow_mut().define_builtin(i, s.name);
+        });
+
+        for table in [global, first_local, second_local] {
+            for expected_symbol in &expected {
+                match table.borrow_mut().resolve(expected_symbol.name) {
+                    Some(actual_symbol) => assert_eq!(expected_symbol.name, actual_symbol.name, "expected to resolve to {}, but got {}", expected_symbol.name, actual_symbol.name),
+                    None => panic!("could not resolve name {}", expected_symbol.name),
                 }
             }
         }

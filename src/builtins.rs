@@ -2,8 +2,6 @@ use std::collections::HashMap;
 
 use crate::object::Object;
 
-type BuiltinFunction = fn(Vec<Object>) -> Object;
-
 fn validate_args(args: &[Object], expected_args: usize, func: &str) -> Option<Object> {
     if args.len() != expected_args {
         return Some(Object::Error(
@@ -43,6 +41,7 @@ fn first_function(args: Vec<Object>) -> Object {
         _ => Object::Error(format!("argument {} not supported by `first`", args[0].inspect()))
     }
 }
+
 fn last_function(args: Vec<Object>) -> Object {
     if let Some(error) = validate_args(&args, 1, "last") {
         return error;
@@ -88,7 +87,7 @@ fn push_function(args: Vec<Object>) -> Object {
 }
 
 pub struct BuiltinFunctions {
-    store: HashMap<String, Object>
+    store: HashMap<&'static str, Object>
 }
 
 impl Default for BuiltinFunctions {
@@ -97,22 +96,18 @@ impl Default for BuiltinFunctions {
     }
 }
 
+pub const BUILTINS: [(&str, Object); 6] = [
+    ("len", Object::BuiltinFunction(len_function)),
+    ("first", Object::BuiltinFunction(first_function)),
+    ("last", Object::BuiltinFunction(last_function)),
+    ("rest", Object::BuiltinFunction(rest_function)),
+    ("push", Object::BuiltinFunction(push_function)),
+    ("print", Object::BuiltinFunction(print_function)),
+];
+
 impl BuiltinFunctions {
-    fn get_store() -> HashMap<String, Object> {
-        let functions = [
-            ("len".to_owned(), len_function as BuiltinFunction),
-            ("first".to_owned(), first_function as BuiltinFunction),
-            ("last".to_owned(), last_function as BuiltinFunction),
-            ("rest".to_owned(), rest_function as BuiltinFunction),
-            ("push".to_owned(), push_function as BuiltinFunction),
-            ("print".to_owned(), print_function as BuiltinFunction),
-        ];
-        functions
-            .iter()
-            .map(|(name, func)| (name.to_owned(), Object::BuiltinFunction(func.to_owned())))
-            .collect::<Vec<(String, Object)>>()
-            .into_iter()
-            .collect()
+    fn get_store() -> HashMap<&'static str, Object> {
+        BUILTINS.into()
     }
 
     pub fn new() -> BuiltinFunctions {

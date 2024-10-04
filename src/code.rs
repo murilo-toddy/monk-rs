@@ -69,6 +69,7 @@ pub enum Opcode {
     ReturnValue = 23,
     GetLocal = 24,
     SetLocal = 25,
+    GetBuiltin = 26,
 }
 
 impl Opcode {
@@ -100,6 +101,7 @@ impl Opcode {
             23 => Some(Opcode::ReturnValue),
             24 => Some(Opcode::GetLocal),
             25 => Some(Opcode::SetLocal),
+            26 => Some(Opcode::GetBuiltin),
             _ => None,
         }
     }
@@ -142,6 +144,7 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::ReturnValue => generate_definition("OpReturnValue", vec![]),
         Opcode::GetLocal => generate_definition("OpGetLocal", vec![1]),
         Opcode::SetLocal => generate_definition("OpSetLocal", vec![1]),
+        Opcode::GetBuiltin => generate_definition("OpGetBuiltin", vec![1]),
     }
 }
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{code::Opcode, compiler::Bytecode, frame::Frame, object::Object};
+use crate::{builtins::BUILTINS, code::Opcode, compiler::Bytecode, frame::Frame, object::Object};
 
 const STACK_SIZE: usize = 2048;
 const GLOBALS_SIZE: usize = 10;
@@ -239,7 +239,7 @@ impl Vm {
             }
     }
 
-    pub fn call_function(&mut self, arguments_count: usize) -> Result<(), String> {
+    fn execute_call(&mut self, arguments_count: usize) -> Result<(), String> {
         match &self.stack[self.sp - 1 - arguments_count] {
             Some(Object::CompiledFunction { function, parameters_count, locals_count }) => {
                 if arguments_count != *parameters_count {
@@ -248,10 +248,20 @@ impl Vm {
                 let frame = Frame::new(function.clone(), self.sp - arguments_count);
                 self.sp = frame.base_pointer + locals_count;
                 self.push_frame(frame);
-            },
-            _ => return Err(format!("attempting to call non-function {:?}", self.stack[self.sp - 1])),
-        };
-        Ok(())
+                Ok(())
+            } 
+            Some(Object::BuiltinFunction(function)) => {
+                let arguments = self.stack[self.sp - arguments_count..self.sp]
+                    .iter()
+                    .map(|o| o.clone().ok_or_else(|| "".to_string()))
+                    .collect::<Result<Vec<Object>, String>>()?;
+                let result = function(arguments);
+                self.sp = self.sp - arguments_count - 1;
+                self.push(result)?;
+                Ok(())
+            }
+            _ => todo!()
+        }
     }
 
     fn ip_add(&mut self, value: i64) {
@@ -345,7 +355,7 @@ impl Vm {
                         if let Some(frame) = self.current_frame() {
                             frame.ip += 1;
                         }
-                        self.call_function(arguments_count)?;
+                        self.execute_call(arguments_count)?;
                     }, 
                     Opcode::Return => {
                         match self.pop_frame() {
@@ -386,6 +396,17 @@ impl Vm {
                                     None => return Err("could not find local binding to push to the stack".to_string()),
                                 }
                             }
+                            None => return Err("vm has no current frame".to_string()),
+                        }
+                    },
+                    Opcode::GetBuiltin => {
+                        match self.current_frame() {
+                            Some(frame) => {
+                                let index = instructions[ip + 1] as usize;
+                                frame.ip += 1;
+                                let definition = BUILTINS[index].clone();
+                                self.push(definition.1)?;
+                            },
                             None => return Err("vm has no current frame".to_string()),
                         }
                     },
@@ -725,12 +746,55 @@ struct VmTestCase {
     }
 
     #[test]
-    // TODO for crying out loud this should be a compiler error!!!!
+    fn test_builtin_functions() {
+        let tests = vec![
+            VmTestCase { 
+                input: "len(\"\")",
+                expected: Object::Integer(0),
+            },
+            VmTestCase { 
+                input: "len(\"four\")",
+                expected: Object::Integer(4),
+            },
+            VmTestCase { 
+                input: "len([1, 2, 3])",
+                expected: Object::Integer(3),
+            },
+            VmTestCase { 
+                input: "len([])",
+                expected: Object::Integer(0),
+            },
+            VmTestCase { 
+                input: "print(\"aa\")",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "first([])",
+                expected: Object::Null,
+            },
+            VmTestCase {
+                input: "first([1, 2, 3])",
+                expected: Object::Integer(1),
+            },
+            VmTestCase {
+                input: "push([], 1)",
+                expected: Object::Array(vec![Object::Integer(1)]),
+            },
+            VmTestCase {
+                input: "rest([1, 2, 3])",
+                expected: Object::Array(vec![Object::Integer(2), Object::Integer(3)]),
+            },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
     fn test_calling_functions_with_wrong_arguments() {
-        let tests: Vec<(&'static str, Result<(), String>)> = vec![
-            ("fn() { 1; }(1)", Err::<(), String>("wrong number of arguments: expected 0 but got 1".to_string())),
-            ("fn(a) { }()", Err::<(), String>("wrong number of arguments: expected 1 but got 0".to_string())),
-            ("fn(a, b) { a + b; }(1)", Err::<(), String>("wrong number of arguments: expected 2 but got 1".to_string())),
+        // TODO for crying out loud this should be a compiler error!!!!
+        let tests: Vec<(_, Result<(), _>)> = vec![
+            ("fn() { 1; }(1)", Err("wrong number of arguments: expected 0 but got 1".to_string())),
+            ("fn(a) { }()", Err("wrong number of arguments: expected 1 but got 0".to_string())),
+            ("fn(a, b) { a + b; }(1)", Err("wrong number of arguments: expected 2 but got 1".to_string())),
         ];
         for (input, expected) in tests {
             let mut compiler = Compiler::new();

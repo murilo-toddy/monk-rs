@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{ast::{BlockStatement, Expression, Program, Statement}, code::{make, Instructions, Opcode}, object::Object, symbol::{SymbolScope, SymbolTable}};
+use crate::{ast::{BlockStatement, Expression, Program, Statement}, builtins::BUILTINS, code::{make, Instructions, Opcode}, object::Object, symbol::{SymbolScope, SymbolTable}};
 
 #[derive(Clone, Debug)]
 pub struct Bytecode {
@@ -38,10 +38,14 @@ impl Compiler {
             last_instruction: None,
             previous_instruction: None,
         };
+        let mut symbol_table = SymbolTable::new();
+        for (index, function) in BUILTINS.into_iter().enumerate() {
+            symbol_table.define_builtin(index, function.0);
+        }
         Compiler {
             constants: vec![],
 
-            symbol_table: Rc::from(RefCell::new(SymbolTable::new())),
+            symbol_table: Rc::from(RefCell::new(symbol_table)),
 
             scopes: vec![main_scope],
             scope_index: 0,
@@ -178,6 +182,7 @@ impl Compiler {
                 match symbol.scope {
                     SymbolScope::Local => self.emit(Opcode::GetLocal, vec![symbol.index as i64]),
                     SymbolScope::Global => self.emit(Opcode::GetGlobal, vec![symbol.index as i64]),
+                    SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, vec![symbol.index as i64]),
                 };
                 Ok(())
             },
@@ -331,6 +336,7 @@ impl Compiler {
                     match symbol.scope {
                         SymbolScope::Local => self.emit(Opcode::SetLocal, vec![symbol.index as i64]),
                         SymbolScope::Global => self.emit(Opcode::SetGlobal, vec![symbol.index as i64]),
+                        SymbolScope::Builtin => todo!()
                     };
                 }
                 Ok(())
@@ -1072,6 +1078,47 @@ mod compiler_tests {
                 ],
                 expected_instructions: vec![
                     make(Opcode::Constant, vec![2]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "len([]); push([], 1);",
+                expected_constants: vec![Object::Integer(1)],
+                expected_instructions: vec![
+                    make(Opcode::GetBuiltin, vec![0]),
+                    make(Opcode::Array, vec![0]),
+                    make(Opcode::Call, vec![1]),
+                    make(Opcode::Pop, vec![]),
+                    make(Opcode::GetBuiltin, vec![4]),
+                    make(Opcode::Array, vec![0]),
+                    make(Opcode::Constant, vec![0]),
+                    make(Opcode::Call, vec![2]),
+                    make(Opcode::Pop, vec![]),
+                ],
+            },
+            CompilerTestCase {
+                input: "fn() { len([]); }",
+                expected_constants: vec![
+                    Object::CompiledFunction {
+                        function: vec![
+                            make(Opcode::GetBuiltin, vec![0]),
+                            make(Opcode::Array, vec![0]),
+                            make(Opcode::Call, vec![1]),
+                            make(Opcode::ReturnValue, vec![]),
+                        ].into_iter().flatten().collect(),
+                        locals_count: 0,
+                        parameters_count: 0,
+                    }
+                ],
+                expected_instructions: vec![
+                    make(Opcode::Constant, vec![0]),
                     make(Opcode::Pop, vec![]),
                 ],
             },
