@@ -5,6 +5,7 @@ pub enum SymbolScope {
     Builtin,
     Global,
     Local,
+    Free,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -20,6 +21,8 @@ pub struct SymbolTable {
     pub definition_count: usize,
 
     pub outer: Option<Rc<RefCell<SymbolTable>>>,
+
+    pub free_symbols: Vec<Symbol>,
 }
 
 impl SymbolTable {
@@ -29,6 +32,7 @@ impl SymbolTable {
             definition_count: 0,
 
             outer: None,
+            free_symbols: vec![],
         }
     }
 
@@ -38,6 +42,7 @@ impl SymbolTable {
             definition_count: 0,
 
             outer: Some(table),
+            free_symbols: vec![],
         }
     }
 
@@ -45,6 +50,17 @@ impl SymbolTable {
         let symbol = Symbol { name, index, scope: SymbolScope::Builtin };
         self.store.insert(name, symbol.clone());
         symbol
+    }
+
+    pub fn define_free(&mut self, original: Symbol) -> Symbol {
+        self.free_symbols.push(original.clone());
+        let free_symbol = Symbol {
+            name: original.name,
+            scope: SymbolScope::Free,
+            index: self.free_symbols.len() - 1,
+        };
+        self.store.insert(original.name, free_symbol.clone());
+        free_symbol
     }
 
     pub fn define(&mut self, identifier: &'static str) -> Symbol {
@@ -62,12 +78,29 @@ impl SymbolTable {
         symbol
     }
 
+    fn resolve_outer_symbol(&mut self, symbol: Option<Symbol>) -> Option<Symbol> {
+        match symbol {
+            Some(symbol) => {
+                match symbol.scope {
+                    SymbolScope::Global | SymbolScope::Builtin => Some(symbol),
+                    _ => {
+                        let free = self.define_free(symbol);
+                        return Some(free);
+                    }
+                }
+            }
+            None => None,
+        }
+    }
     pub fn resolve(&mut self, identifier: &'static str) -> Option<Symbol> {
         match self.store.get(identifier).cloned() {
             Some(symbol) => Some(symbol),
-            None => match self.outer.as_ref() {
-                Some(table) => table.borrow_mut().resolve(identifier),
-                None => None,
+            None => {
+                let outer = match self.outer.as_ref() {
+                    Some(table) => table.borrow_mut().resolve(identifier),
+                    None => None,
+                }; 
+                self.resolve_outer_symbol(outer)
             }
         }
     }
@@ -228,6 +261,96 @@ mod symbol_tests {
                     None => panic!("could not resolve name {}", expected_symbol.name),
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_resolve_free() {
+        let global = Rc::new(RefCell::from(SymbolTable::new()));
+        global.borrow_mut().define("a");
+        global.borrow_mut().define("b");
+
+        let first_local = Rc::new(RefCell::from(SymbolTable::enclosing(Rc::clone(&global))));
+        first_local.borrow_mut().define("c");
+        first_local.borrow_mut().define("d");
+
+        let second_local = Rc::new(RefCell::from(SymbolTable::enclosing(Rc::clone(&first_local))));
+        second_local.borrow_mut().define("e");
+        second_local.borrow_mut().define("f");
+
+        let tests = [
+            (
+                first_local,
+                vec![
+                    Symbol { name: "a", scope: SymbolScope::Global, index: 0 },
+                    Symbol { name: "b", scope: SymbolScope::Global, index: 1 },
+                    Symbol { name: "c", scope: SymbolScope::Local, index: 0 },
+                    Symbol { name: "d", scope: SymbolScope::Local, index: 1 },
+                ],
+                vec![],
+            ),
+            (
+                second_local,
+                vec![
+                    Symbol { name: "a", scope: SymbolScope::Global, index: 0 },
+                    Symbol { name: "b", scope: SymbolScope::Global, index: 1 },
+                    Symbol { name: "c", scope: SymbolScope::Free, index: 0 },
+                    Symbol { name: "d", scope: SymbolScope::Free, index: 1 },
+                    Symbol { name: "e", scope: SymbolScope::Local, index: 0 },
+                    Symbol { name: "f", scope: SymbolScope::Local, index: 1 },
+                ],
+                vec![
+                    Symbol { name: "c", scope: SymbolScope::Local, index: 0 },
+                    Symbol { name: "d", scope: SymbolScope::Local, index: 1 },
+                ],
+            )
+        ];
+
+        for (table, expected_symbols, expected_free) in tests {
+            for symbol in expected_symbols {
+                let actual_symbol = table.borrow_mut().resolve(symbol.name);
+                match actual_symbol {
+                    Some(actual_symbol) => assert_eq!(symbol, actual_symbol, "expected {:?} but got {:?}", symbol, actual_symbol),
+                    None => panic!("could not resolve symbol {:?}", symbol),
+                }
+            }
+            for (index, symbol) in expected_free.into_iter().enumerate() {
+                let actual_symbol = table.borrow_mut().free_symbols[index].clone();
+                assert_eq!(symbol, actual_symbol, "expected {:?} but got {:?}", symbol, actual_symbol);
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_unresolvable_free() {
+        let global = Rc::new(RefCell::from(SymbolTable::new()));
+        global.borrow_mut().define("a");
+
+        let first_local = Rc::new(RefCell::from(SymbolTable::enclosing(Rc::clone(&global))));
+        first_local.borrow_mut().define("c");
+
+        let second_local = Rc::new(RefCell::from(SymbolTable::enclosing(Rc::clone(&first_local))));
+        second_local.borrow_mut().define("e");
+        second_local.borrow_mut().define("f");
+
+        let expected = [
+            Symbol { name: "a", scope: SymbolScope::Global, index: 0 },
+            Symbol { name: "c", scope: SymbolScope::Free, index: 0 },
+            Symbol { name: "e", scope: SymbolScope::Local, index: 0 },
+            Symbol { name: "f", scope: SymbolScope::Local, index: 1 },
+        ];
+        for symbol in expected {
+            let actual_symbol = second_local.borrow_mut().resolve(symbol.name);
+            match actual_symbol {
+                Some(actual_symbol) => assert_eq!(symbol, actual_symbol, "expected {:?} but got {:?}", symbol, actual_symbol),
+                None => panic!("could not resolve symbol {:?}", symbol),
+            }
+        }
+
+        let unresolvable = ["b", "d"];
+        for name in unresolvable {
+            let result = second_local.borrow_mut().resolve(name);
+            assert_eq!(result, None, "expected to get undefined but got {}", name);
         }
     }
 }

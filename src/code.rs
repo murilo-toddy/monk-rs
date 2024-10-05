@@ -13,6 +13,7 @@ fn format_instruction(def: Definition, operands: Vec<i64>) -> String {
     match operand_count {
         0 => def.name.to_owned(),
         1 => format!("{} {}", def.name, operands[0]),
+        2 => format!("{} {} {}", def.name, operands[0], operands[1]),
         _ => format!("ERROR: unhandled operand count for {}", def.name),
     }
 }
@@ -70,6 +71,8 @@ pub enum Opcode {
     GetLocal = 24,
     SetLocal = 25,
     GetBuiltin = 26,
+    Closure = 27,
+    GetFree = 28,
 }
 
 impl Opcode {
@@ -102,6 +105,8 @@ impl Opcode {
             24 => Some(Opcode::GetLocal),
             25 => Some(Opcode::SetLocal),
             26 => Some(Opcode::GetBuiltin),
+            27 => Some(Opcode::Closure),
+            28 => Some(Opcode::GetFree),
             _ => None,
         }
     }
@@ -145,6 +150,8 @@ pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
         Opcode::GetLocal => generate_definition("OpGetLocal", vec![1]),
         Opcode::SetLocal => generate_definition("OpSetLocal", vec![1]),
         Opcode::GetBuiltin => generate_definition("OpGetBuiltin", vec![1]),
+        Opcode::Closure => generate_definition("OpClosure", vec![2, 1]),
+        Opcode::GetFree => generate_definition("OpClosure", vec![1]),
     }
 }
 
@@ -199,6 +206,7 @@ mod code_tests {
             make(Opcode::Constant, vec![65535]),
             make(Opcode::GetLocal, vec![1]),
             make(Opcode::Pop, vec![]),
+            make(Opcode::Closure, vec![65535, 255]),
         ];
 
         let expected = "0000 OpAdd
@@ -206,6 +214,7 @@ mod code_tests {
 0004 OpConstant 65535
 0007 OpGetLocal 1
 0009 OpPop
+0010 OpClosure 65535 255
 ";
 
         let instructions_concat: Instructions = instructions.into_iter().flatten().collect();
@@ -223,7 +232,8 @@ mod code_tests {
     fn test_read_operands() {
         let tests = vec![
             (Opcode::Constant, vec![65535], 2),
-            (Opcode::GetLocal, vec![255], 1)
+            (Opcode::GetLocal, vec![255], 1),
+            (Opcode::Closure, vec![65535, 255], 3),
         ];
         for (opcode, operands, bytes_read) in tests {
             let op = opcode.clone() as u8;
@@ -253,6 +263,7 @@ mod code_tests {
             ),
             (Opcode::Add, vec![], vec![Opcode::Add as u8]),
             (Opcode::GetLocal, vec![255], vec![Opcode::GetLocal as u8, 255]),
+            (Opcode::Closure, vec![65534, 255], vec![Opcode::Closure as u8, 255 as u8, 254 as u8, 255 as u8]),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, operands);

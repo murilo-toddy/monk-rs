@@ -34,7 +34,16 @@ impl Vm {
     }
 
     pub fn reset(&mut self, bytecode: Bytecode) -> Vm {
-        let main_frame = Frame::new(bytecode.instructions, 0);
+        let main_function = Object::CompiledFunction { 
+            function: bytecode.instructions,
+            locals_count: 0,
+            parameters_count: 0,
+        };
+        let main_closure = Object::Closure {
+            function: Box::from(main_function),
+            free_variables: vec![],
+        };
+        let main_frame = Frame::new(main_closure, 0);
         let mut frames = vec![None; MAX_FRAMES];
         frames[0] = Some(main_frame);
         Vm {
@@ -50,6 +59,7 @@ impl Vm {
         }
     }
 
+    // TODO can i remove the option?
     fn current_frame(&mut self) -> &mut Option<Frame> {
         &mut self.frames[self.frame_index - 1]
     }
@@ -241,14 +251,20 @@ impl Vm {
 
     fn execute_call(&mut self, arguments_count: usize) -> Result<(), String> {
         match &self.stack[self.sp - 1 - arguments_count] {
-            Some(Object::CompiledFunction { function, parameters_count, locals_count }) => {
-                if arguments_count != *parameters_count {
-                    return Err(format!("wrong number of arguments: expected {} but got {}", *parameters_count, arguments_count));
+            Some(Object::Closure { function: closure_function, free_variables }) => {
+                // TODO remove
+                match *closure_function.clone() {
+                    Object::CompiledFunction { parameters_count, locals_count, .. } => {
+                        if arguments_count != parameters_count {
+                            return Err(format!("wrong number of arguments: expected {} but got {}", parameters_count, arguments_count));
+                        }
+                        let frame = Frame::new(Object::Closure { function: closure_function.clone(), free_variables: free_variables.clone() }, self.sp - arguments_count);
+                        self.sp = frame.base_pointer + locals_count;
+                        self.push_frame(frame);
+                        Ok(())
+                    }
+                    _ => return Err("".to_string()),
                 }
-                let frame = Frame::new(function.clone(), self.sp - arguments_count);
-                self.sp = frame.base_pointer + locals_count;
-                self.push_frame(frame);
-                Ok(())
             } 
             Some(Object::BuiltinFunction(function)) => {
                 let arguments = self.stack[self.sp - arguments_count..self.sp]
@@ -262,6 +278,21 @@ impl Vm {
             }
             _ => todo!()
         }
+    }
+
+    fn push_closure(&mut self, index: usize, free_count: usize) -> Result<(), String> {
+        let constant = self.constants[index].clone();
+        if let Object::CompiledFunction { .. } = constant {
+            let free_variables = self.stack[self.sp - free_count..self.sp]
+                .iter()
+                .map(|o| o.clone().ok_or_else(|| "unable to build array, got empty object from stack".to_string()))
+                .collect::<Result<Vec<Object>, String>>()?;
+
+            self.sp = self.sp - free_count;
+            self.push(Object::Closure { function: Box::from(constant), free_variables })?;
+            return Ok(());
+        }
+        Err(format!("not a function {:?}", constant))
     }
 
     fn ip_add(&mut self, value: i64) {
@@ -409,6 +440,32 @@ impl Vm {
                             },
                             None => return Err("vm has no current frame".to_string()),
                         }
+                    },
+                    Opcode::Closure => {
+                        match self.current_frame() {
+                            Some(frame) => {
+                                let index = u16::from_be_bytes(instructions[ip+1..ip+3].try_into().unwrap()) as usize;
+                                let free_count = instructions[ip + 3] as usize;
+                                frame.ip += 3;
+                                self.push_closure(index, free_count)?;
+                            },
+                            None => return Err("vm has no current frame".to_string())
+                        }
+                    },
+                    Opcode::GetFree => {
+                        let object = match self.current_frame() {
+                            Some(frame) => {
+                                let index = instructions[ip + 1] as usize;
+                                frame.ip += 1;
+
+                                match &frame.closure {
+                                    Object::Closure { free_variables, .. } => free_variables[index].clone(),
+                                    _ => return Err("vm has no current frame".to_string())
+                                }
+                            },
+                            None => return Err("vm has no current frame".to_string())
+                        };
+                        self.push(object)?;
                     },
                 };
             } else {
@@ -783,6 +840,49 @@ struct VmTestCase {
             VmTestCase {
                 input: "rest([1, 2, 3])",
                 expected: Object::Array(vec![Object::Integer(2), Object::Integer(3)]),
+            },
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_closures() {
+        let tests = vec![
+            VmTestCase { 
+                input: "let newClosure = fn(a) { fn() { a } }; let closure = newClosure(99); closure();",
+                expected: Object::Integer(99),
+            },
+            VmTestCase { 
+                input: "
+                    let newAdder = fn(a, b) {
+                        fn(c) { a + b + c };
+                    };
+                    let adder = newAdder(1, 2);
+                    adder(8) 
+                ",
+                expected: Object::Integer(11),
+            },
+            VmTestCase { 
+                input: "
+                    let newAdder = fn(a, b) {
+                        fn(c) { a + b + c; }
+                    };
+                    let adder = newAdder(1, 2);
+                    adder(8);
+                ",
+                expected: Object::Integer(11),
+            },
+            VmTestCase { 
+                input: "
+                    let newClosure = fn(a, b) {
+                        let one = fn() { a }
+                        let two = fn() { b }
+                        fn() { one() + two() }
+                    }
+                    let closure = newClosure(9, 90);
+                    closure();
+                ",
+                expected: Object::Integer(99),
             },
         ];
         run_vm_tests(tests);

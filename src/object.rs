@@ -17,6 +17,10 @@ pub enum Object {
         locals_count: usize,
         parameters_count: usize,
     },
+    Closure {
+        function: Box<Object>, // Object::CompiledFunction
+        free_variables: Vec<Object>,
+    },
     Array(Vec<Object>),
     Hash(HashMap<Object, Object>),
 }
@@ -35,6 +39,7 @@ impl Object {
                 format!("fn({}) {{\n{}\n}}", s, body)
             },
             Object::CompiledFunction { .. } => "compiled function".to_string(),
+            Object::Closure { .. } => "closure".to_string(),
             Object::BuiltinFunction(_) => "builtin function".to_owned(),
             Object::Array(elements) => {
                 format!("[{}]", elements.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", "))
