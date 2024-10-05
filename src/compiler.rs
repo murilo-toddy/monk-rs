@@ -344,8 +344,8 @@ impl Compiler {
         match statement {
             Statement::Let { name, value, .. } => {
                 if let Some(value) = value {
-                    self.compile_expression(value)?;
                     let symbol = self.symbol_table.borrow_mut().define(name.value);
+                    self.compile_expression(value)?;
                     match symbol.scope {
                         SymbolScope::Local => self.emit(Opcode::SetLocal, vec![symbol.index as i64]),
                         SymbolScope::Global => self.emit(Opcode::SetGlobal, vec![symbol.index as i64]),
