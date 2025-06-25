@@ -1,6 +1,13 @@
-use std::{collections::HashMap, hash::{Hash, Hasher}};
+use std::{
+    collections::HashMap,
+    hash::{Hash, Hasher},
+};
 
-use crate::{ast::{BlockStatement, Identifier}, code::Instructions, environment::Environment};
+use crate::{
+    ast::{BlockStatement, Identifier},
+    code::Instructions,
+    environment::Environment,
+};
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Object {
@@ -35,18 +42,36 @@ impl Object {
             Object::ReturnValue(value) => value.inspect(),
             Object::Error(message) => format!("ERROR: {}", message),
             Object::Function(params, body, _) => {
-                let s = params.iter().map(|p| p.value).collect::<Vec<&'static str>>().join(", ");
+                let s = params
+                    .iter()
+                    .map(|p| p.value)
+                    .collect::<Vec<&'static str>>()
+                    .join(", ");
                 format!("fn({}) {{\n{}\n}}", s, body)
-            },
+            }
             Object::CompiledFunction { .. } => "compiled function".to_string(),
             Object::Closure { .. } => "closure".to_string(),
             Object::BuiltinFunction(_) => "builtin function".to_owned(),
             Object::Array(elements) => {
-                format!("[{}]", elements.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", "))
-            },
+                format!(
+                    "[{}]",
+                    elements
+                        .iter()
+                        .map(|e| e.inspect())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
             Object::Hash(pairs) => {
-                format!("{{{}}}", pairs.iter().map(|(k, v)| format!("{}: {}", k.inspect(), v.inspect())).collect::<Vec<String>>().join(", "))
-            },
+                format!(
+                    "{{{}}}",
+                    pairs
+                        .iter()
+                        .map(|(k, v)| format!("{}: {}", k.inspect(), v.inspect()))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
         }
     }
 }

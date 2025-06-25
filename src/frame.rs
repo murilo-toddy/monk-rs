@@ -15,7 +15,11 @@ impl Frame {
                 base_pointer,
                 ip: -1,
             },
-            _ => Frame { closure: Object::Null, base_pointer: 0, ip: 0 }
+            _ => Frame {
+                closure: Object::Null,
+                base_pointer: 0,
+                ip: 0,
+            },
         }
     }
 
@@ -23,7 +27,7 @@ impl Frame {
         // TODO this is ass
         if let Object::Closure { function, .. } = self.closure.clone() {
             if let Object::CompiledFunction { function, .. } = *function {
-                return function
+                return function;
             }
         }
         vec![]

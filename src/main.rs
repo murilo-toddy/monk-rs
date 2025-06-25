@@ -1,22 +1,22 @@
+use std::env;
 use std::fs;
 use std::io;
-use std::env;
 use std::io::Write;
 
-pub mod token;
-pub mod lexer;
-pub mod repl;
 pub mod ast;
-pub mod parser;
-pub mod object;
-pub mod evaluator;
-pub mod environment;
 pub mod builtins;
 pub mod code;
 pub mod compiler;
-pub mod vm;
-pub mod symbol;
+pub mod environment;
+pub mod evaluator;
 pub mod frame;
+pub mod lexer;
+pub mod object;
+pub mod parser;
+pub mod repl;
+pub mod symbol;
+pub mod token;
+pub mod vm;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -25,8 +25,7 @@ fn main() -> io::Result<()> {
     let mut writer = output.lock();
 
     if args.len() == 2 {
-        let input = fs::read_to_string(&args[1])
-            .expect("Should be able to read file");
+        let input = fs::read_to_string(&args[1]).expect("Should be able to read file");
 
         let env = environment::Environment::new();
         let mut evaluator = evaluator::Evaluator::new(env);
@@ -40,15 +39,11 @@ fn main() -> io::Result<()> {
             writer.flush()?;
         }
         evaluator.evaluate_program(program);
-    }
-
-    else if args.len() == 1 {
+    } else if args.len() == 1 {
         let input = io::stdin();
         let mut reader = input.lock();
         repl::start(&mut reader, &mut writer)?;
-    }
-
-    else {
+    } else {
         writer.write_all("Usage: cargo run -- <filename>.mk\n".as_bytes())?;
         writer.flush()?;
     }

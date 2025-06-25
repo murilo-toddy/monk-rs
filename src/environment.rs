@@ -16,9 +16,9 @@ impl Default for Environment {
 
 impl Environment {
     pub fn new() -> Environment {
-        Environment { 
+        Environment {
             store: HashMap::new(),
-            outer: None
+            outer: None,
         }
     }
 
@@ -32,11 +32,9 @@ impl Environment {
     pub fn get(&mut self, value: &'static str) -> Option<Object> {
         match self.store.get(value) {
             Some(value) => Some(value.clone()),
-            None => {
-                match self.outer.as_mut() {
-                    Some(outer) => outer.get(value),
-                    None => None,
-                }
+            None => match self.outer.as_mut() {
+                Some(outer) => outer.get(value),
+                None => None,
             },
         }
     }

@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use crate::{object::Object, ast::{Program, Statement, Expression, BlockStatement}, environment::Environment, builtins::BuiltinFunctions};
+use crate::{
+    ast::{BlockStatement, Expression, Program, Statement},
+    builtins::BuiltinFunctions,
+    environment::Environment,
+    object::Object,
+};
 
 pub struct Evaluator {
     env: Environment,
@@ -9,7 +14,7 @@ pub struct Evaluator {
 
 impl Evaluator {
     pub fn new(env: Environment) -> Evaluator {
-        Evaluator { 
+        Evaluator {
             env,
             builtin: BuiltinFunctions::new(),
         }
@@ -20,7 +25,10 @@ impl Evaluator {
     }
 
     fn is_truthy(&self, object: &Object) -> bool {
-        !matches!(object, Object::Boolean(false) | Object::Integer(0) | Object::Null)
+        !matches!(
+            object,
+            Object::Boolean(false) | Object::Integer(0) | Object::Null
+        )
     }
 
     fn evaluate_prefix_expression(&mut self, operator: String, right: Expression) -> Object {
@@ -29,23 +37,23 @@ impl Evaluator {
             return right_eval;
         }
         match operator.as_str() {
-            "!" => {
-                match right_eval {
-                    Object::Boolean(value) => return Object::Boolean(!value),
-                    Object::Integer(value) => return Object::Boolean(value == 0),
-                    Object::Null => return Object::Boolean(true),
-                    _ => {}
-                }
-            }
-            "-" => {
-                match right_eval {
-                    Object::Integer(value) => return Object::Integer(-value),
-                    _ => {}
-                }
-            }
+            "!" => match right_eval {
+                Object::Boolean(value) => return Object::Boolean(!value),
+                Object::Integer(value) => return Object::Boolean(value == 0),
+                Object::Null => return Object::Boolean(true),
+                _ => {}
+            },
+            "-" => match right_eval {
+                Object::Integer(value) => return Object::Integer(-value),
+                _ => {}
+            },
             _ => {}
         }
-        Object::Error(format!("unknown operation: {}{}", operator, right_eval.inspect()))
+        Object::Error(format!(
+            "unknown operation: {}{}",
+            operator,
+            right_eval.inspect()
+        ))
     }
 
     fn evaluate_reassign_expression(&mut self, left: Expression, right: Expression) -> Object {
@@ -61,7 +69,7 @@ impl Evaluator {
                 } else {
                     return Object::Error(format!("identifier {} not found", value));
                 }
-            },
+            }
             Expression::Index { left, index, .. } => {
                 if let Expression::Identifier { value, .. } = *left.clone() {
                     let left_eval = self.evaluate_expression(*left);
@@ -82,32 +90,47 @@ impl Evaluator {
                         Object::Array(mut arr) => {
                             if let Object::Integer(idx) = index_eval {
                                 if arr.is_empty() || idx < 0 || idx > (arr.len() as i64) - 1 {
-                                    return Object::Error(format!("index {} out of bounds for array [{}]", 
-                                        idx, arr.iter().map(|e| e.inspect()).collect::<Vec<String>>().join(", ")));
+                                    return Object::Error(format!(
+                                        "index {} out of bounds for array [{}]",
+                                        idx,
+                                        arr.iter()
+                                            .map(|e| e.inspect())
+                                            .collect::<Vec<String>>()
+                                            .join(", ")
+                                    ));
                                 }
                                 arr[idx as usize] = right_eval.clone();
-                                self.env.set(value, Object::Array(arr.to_owned()).to_owned());
+                                self.env
+                                    .set(value, Object::Array(arr.to_owned()).to_owned());
                                 return right_eval;
                             }
-                            return Object::Error(format!("expected index to be integer but got {}", index_eval.inspect()));
-                        },
+                            return Object::Error(format!(
+                                "expected index to be integer but got {}",
+                                index_eval.inspect()
+                            ));
+                        }
                         Object::Hash(mut hash) => {
-                            hash.insert(index_eval, right_eval.clone()); 
+                            hash.insert(index_eval, right_eval.clone());
                             self.env.set(value, Object::Hash(hash));
                             return right_eval;
-                        },
-                        _ => return Object::Error(format!("cannot reassign object {}", left_eval.inspect())),
+                        }
+                        _ => {
+                            return Object::Error(format!(
+                                "cannot reassign object {}",
+                                left_eval.inspect()
+                            ))
+                        }
                     }
-                } 
+                }
             }
             _ => {}
         }
         Object::Null
     }
-        
+
     fn evaluate_infix_expression(
         &mut self,
-        operator: &'static str, 
+        operator: &'static str,
         left: Expression,
         right: Expression,
     ) -> Object {
@@ -125,51 +148,63 @@ impl Evaluator {
         }
 
         match (&left_eval, &right_eval) {
-            (Object::Integer(left_val), Object::Integer(right_val)) => {
-                match operator {
-                    "+" => Object::Integer(left_val + right_val),
-                    "-" => Object::Integer(left_val - right_val),
-                    "*" => Object::Integer(left_val * right_val),
-                    "/" => Object::Integer(left_val / right_val),
-                    "%" => Object::Integer(left_val % right_val),
-                    "==" => Object::Boolean(left_val == right_val),
-                    "!=" => Object::Boolean(left_val != right_val),
-                    "&" => Object::Integer(left_val & right_val),
-                    "|" => Object::Integer(left_val | right_val),
-                    "^" => Object::Integer(left_val ^ right_val),
-                    "<<" => Object::Integer(left_val << right_val),
-                    ">>" => Object::Integer(left_val >> right_val),
-                    "&&" => Object::Boolean(*left_val != 0 && *right_val != 0),
-                    "||" => Object::Boolean(*left_val != 0 || *right_val != 0),
-                    ">=" => Object::Boolean(left_val >= right_val),
-                    "<=" => Object::Boolean(left_val <= right_val),
-                    ">" => Object::Boolean(left_val > right_val),
-                    "<" => Object::Boolean(left_val < right_val),
-                    _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
-                }
+            (Object::Integer(left_val), Object::Integer(right_val)) => match operator {
+                "+" => Object::Integer(left_val + right_val),
+                "-" => Object::Integer(left_val - right_val),
+                "*" => Object::Integer(left_val * right_val),
+                "/" => Object::Integer(left_val / right_val),
+                "%" => Object::Integer(left_val % right_val),
+                "==" => Object::Boolean(left_val == right_val),
+                "!=" => Object::Boolean(left_val != right_val),
+                "&" => Object::Integer(left_val & right_val),
+                "|" => Object::Integer(left_val | right_val),
+                "^" => Object::Integer(left_val ^ right_val),
+                "<<" => Object::Integer(left_val << right_val),
+                ">>" => Object::Integer(left_val >> right_val),
+                "&&" => Object::Boolean(*left_val != 0 && *right_val != 0),
+                "||" => Object::Boolean(*left_val != 0 || *right_val != 0),
+                ">=" => Object::Boolean(left_val >= right_val),
+                "<=" => Object::Boolean(left_val <= right_val),
+                ">" => Object::Boolean(left_val > right_val),
+                "<" => Object::Boolean(left_val < right_val),
+                _ => Object::Error(format!(
+                    "unknown operation: {} {} {}",
+                    left_val, operator, right_val
+                )),
             },
-            (Object::Boolean(left_val), Object::Boolean(right_val)) => {
-                match operator {
-                    "==" => Object::Boolean(left_val == right_val),
-                    "!=" => Object::Boolean(left_val != right_val),
-                    "&&" => Object::Boolean(*left_val && *right_val),
-                    "||" => Object::Boolean(*left_val || *right_val),
-                    _ => Object::Error(format!("unknown operation: {} {} {}", left_val, operator, right_val))
-                }
-            }
-            (Object::String(left_val), Object::String(right_val)) => {
-                match operator {
-                    "+" => Object::String(Box::leak((left_val.to_string() + right_val).into_boxed_str())),
-                    "==" => Object::Boolean(left_val == right_val),
-                    "!=" => Object::Boolean(left_val != right_val),
-                    _ => Object::Error(format!("unknown operation: string {} string", operator))
-                }
-            }
+            (Object::Boolean(left_val), Object::Boolean(right_val)) => match operator {
+                "==" => Object::Boolean(left_val == right_val),
+                "!=" => Object::Boolean(left_val != right_val),
+                "&&" => Object::Boolean(*left_val && *right_val),
+                "||" => Object::Boolean(*left_val || *right_val),
+                _ => Object::Error(format!(
+                    "unknown operation: {} {} {}",
+                    left_val, operator, right_val
+                )),
+            },
+            (Object::String(left_val), Object::String(right_val)) => match operator {
+                "+" => Object::String(Box::leak(
+                    (left_val.to_string() + right_val).into_boxed_str(),
+                )),
+                "==" => Object::Boolean(left_val == right_val),
+                "!=" => Object::Boolean(left_val != right_val),
+                _ => Object::Error(format!("unknown operation: string {} string", operator)),
+            },
             _ => {
                 if std::mem::discriminant(&left_eval) != std::mem::discriminant(&right_eval) {
-                    Object::Error(format!("type mismatch: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
+                    Object::Error(format!(
+                        "type mismatch: {} {} {}",
+                        left_eval.inspect(),
+                        operator,
+                        right_eval.inspect()
+                    ))
                 } else {
-                    Object::Error(format!("unknown operation: {} {} {}", left_eval.inspect(), operator, right_eval.inspect()))
+                    Object::Error(format!(
+                        "unknown operation: {} {} {}",
+                        left_eval.inspect(),
+                        operator,
+                        right_eval.inspect()
+                    ))
                 }
             }
         }
@@ -206,7 +241,11 @@ impl Evaluator {
         alternative.map_or(Object::Null, |a| self.evaluate_block_statement(a))
     }
 
-    fn evaluate_while_expression(&mut self, condition: Expression, block_statement: BlockStatement) -> Object {
+    fn evaluate_while_expression(
+        &mut self,
+        condition: Expression,
+        block_statement: BlockStatement,
+    ) -> Object {
         let mut result: Option<Object> = None;
         loop {
             let condition_eval = self.evaluate_expression(condition.clone());
@@ -214,7 +253,7 @@ impl Evaluator {
                 return condition_eval;
             }
             if !self.is_truthy(&condition_eval) {
-                break
+                break;
             }
             result = Some(self.evaluate_block_statement(block_statement.clone()));
         }
@@ -226,7 +265,7 @@ impl Evaluator {
         declaration: Statement,
         condition: Expression,
         operation: Expression,
-        block_statement: BlockStatement
+        block_statement: BlockStatement,
     ) -> Object {
         let mut result = None;
         self.evaluate_statement(declaration);
@@ -236,12 +275,12 @@ impl Evaluator {
                 return condition_eval;
             }
             if !self.is_truthy(&condition_eval) {
-                break
+                break;
             }
             result = Some(self.evaluate_block_statement(block_statement.clone()));
             self.evaluate_expression(operation.clone());
         }
-        
+
         result.unwrap_or(Object::Null)
     }
 
@@ -266,10 +305,13 @@ impl Evaluator {
                     }
                     return elements[index as usize].clone();
                 }
-            },
+            }
             Object::Hash(elements) => {
-                return elements.get(&index).map(|v| v.to_owned()).unwrap_or(Object::Null);
-            },
+                return elements
+                    .get(&index)
+                    .map(|v| v.to_owned())
+                    .unwrap_or(Object::Null);
+            }
             _ => {}
         }
         Object::Error("index operator not supported".to_owned())
@@ -293,37 +335,52 @@ impl Evaluator {
 
     fn evaluate_expression(&mut self, expression: Expression) -> Object {
         match expression {
-            Expression::Identifier { value, .. } => {
-                self.env.get(value)
-                    .or_else(|| self.builtin.get_function_object(value))
-                    .unwrap_or(Object::Error(format!("identifier not found: {}", value)))
-            },
+            Expression::Identifier { value, .. } => self
+                .env
+                .get(value)
+                .or_else(|| self.builtin.get_function_object(value))
+                .unwrap_or(Object::Error(format!("identifier not found: {}", value))),
             Expression::Integer { value, .. } => Object::Integer(value),
             Expression::String { value, .. } => Object::String(value),
             Expression::Boolean { value, .. } => Object::Boolean(value),
-            Expression::Prefix { operator, right, .. } => {
-                self.evaluate_prefix_expression(operator, *right)
-            },
-            Expression::Infix { operator, left, right, .. } => {
-                self.evaluate_infix_expression(operator, *left, *right)
-            },
-            Expression::If { conditions, alternative, .. } => {
-                self.evaluate_conditional_expression(conditions, alternative)
-            },
-            Expression::Function { arguments, body, .. } => {
-                Object::Function(arguments, body, self.env.clone())
-            },
-            Expression::While { condition, statement, .. } => {
-                self.evaluate_while_expression(*condition, statement)
-            },
-            Expression::For { declaration, condition, operation, statement, .. } => {
-                self.evaluate_for_expression(*declaration, *condition, *operation, statement)
-            },
-            Expression::Call { function, arguments, .. } => {
+            Expression::Prefix {
+                operator, right, ..
+            } => self.evaluate_prefix_expression(operator, *right),
+            Expression::Infix {
+                operator,
+                left,
+                right,
+                ..
+            } => self.evaluate_infix_expression(operator, *left, *right),
+            Expression::If {
+                conditions,
+                alternative,
+                ..
+            } => self.evaluate_conditional_expression(conditions, alternative),
+            Expression::Function {
+                arguments, body, ..
+            } => Object::Function(arguments, body, self.env.clone()),
+            Expression::While {
+                condition,
+                statement,
+                ..
+            } => self.evaluate_while_expression(*condition, statement),
+            Expression::For {
+                declaration,
+                condition,
+                operation,
+                statement,
+                ..
+            } => self.evaluate_for_expression(*declaration, *condition, *operation, statement),
+            Expression::Call {
+                function,
+                arguments,
+                ..
+            } => {
                 let func = self.evaluate_expression(*function);
                 if self.is_error(&func) {
                     return func;
-                } 
+                }
                 let args = self.evaluate_expressions(arguments);
                 if let Some(Object::Error(_)) = args.first() {
                     return args[0].to_owned();
@@ -336,7 +393,7 @@ impl Evaluator {
                     return elements[0].to_owned();
                 }
                 Object::Array(elements)
-            },
+            }
             Expression::Hash { pairs, .. } => self.evaluate_hash_literal(pairs),
             Expression::Index { left, index, .. } => {
                 let left_exp = self.evaluate_expression(*left);
@@ -348,7 +405,7 @@ impl Evaluator {
                     return index_exp;
                 }
                 self.evaluate_index_expression(left_exp, index_exp)
-            },
+            }
         }
     }
 
@@ -362,9 +419,9 @@ impl Evaluator {
                     Object::ReturnValue(value) => *value.to_owned(),
                     _ => evaluated,
                 }
-            },
+            }
             Object::BuiltinFunction(func) => func(args),
-            _ => Object::Error("expected function".to_owned())
+            _ => Object::Error("expected function".to_owned()),
         }
     }
 
@@ -388,12 +445,14 @@ impl Evaluator {
                 }
                 self.env.set(name.value, value_eval.clone());
                 Some(value_eval)
-            },
+            }
             Statement::Return { value, .. } => {
                 let value_eval = value.map(|v| self.evaluate_expression(v))?;
                 Some(Object::ReturnValue(Box::new(value_eval)))
-            },
-            Statement::Expression { expression, .. } => expression.map(|v|  self.evaluate_expression(v)),
+            }
+            Statement::Expression { expression, .. } => {
+                expression.map(|v| self.evaluate_expression(v))
+            }
         }
     }
 
@@ -411,12 +470,11 @@ impl Evaluator {
     }
 }
 
-
 #[cfg(test)]
 mod evaluator_tests {
     use std::collections::HashMap;
 
-    use crate::{lexer::Lexer, parser::Parser, ast::Identifier, token::Token};
+    use crate::{ast::Identifier, lexer::Lexer, parser::Parser, token::Token};
 
     use super::*;
 
@@ -471,7 +529,10 @@ mod evaluator_tests {
     fn test_string_expression_eval() {
         let tests = vec![
             ("\"Hello World!\"", Object::String("Hello World!")),
-            ("\"Hello\" + \" \" + \"World!\"", Object::String("Hello World!")),
+            (
+                "\"Hello\" + \" \" + \"World!\"",
+                Object::String("Hello World!"),
+            ),
             ("\"a\" == \"a\"", Object::Boolean(true)),
             ("\"a\" == \"aa\"", Object::Boolean(false)),
             ("\"a\" == \"b\"", Object::Boolean(false)),
@@ -550,8 +611,14 @@ mod evaluator_tests {
             ("if (1 < 2) { 10 }", Object::Integer(10)),
             ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
             ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
-            ("if (1 > 2) { 10 } else if (1 == 2) { 20 } else { 30 }", Object::Integer(30)),
-            ("if (1 > 2) { 10 } else if (1 < 2) { 20 } else { 30 }", Object::Integer(20)),
+            (
+                "if (1 > 2) { 10 } else if (1 == 2) { 20 } else { 30 }",
+                Object::Integer(30),
+            ),
+            (
+                "if (1 > 2) { 10 } else if (1 < 2) { 20 } else { 30 }",
+                Object::Integer(20),
+            ),
             ("if (1 > 2) { 10 } else if (1 == 2) { 20 }", Object::Null),
         ];
 
@@ -564,8 +631,14 @@ mod evaluator_tests {
     #[test]
     fn test_while_expression_eval() {
         let tests = vec![
-            ("let i = 0; while (i < 2) { let i = i + 1; }", Object::Integer(2)),
-            ("let i = 0; while (i < 25) { let i = i + 10; }", Object::Integer(30)),
+            (
+                "let i = 0; while (i < 2) { let i = i + 1; }",
+                Object::Integer(2),
+            ),
+            (
+                "let i = 0; while (i < 25) { let i = i + 10; }",
+                Object::Integer(30),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -577,8 +650,14 @@ mod evaluator_tests {
     #[test]
     fn test_for_expression_eval() {
         let tests = vec![
-            ("let x = 0; for (let i = 0; i < 11; i = i + 1) { let x = x + i; }; x;", Object::Integer(55)),
-            ("for (let i = 0; i < 11; i = i + 1) { i; };", Object::Integer(10)),
+            (
+                "let x = 0; for (let i = 0; i < 11; i = i + 1) { let x = x + i; }; x;",
+                Object::Integer(55),
+            ),
+            (
+                "for (let i = 0; i < 11; i = i + 1) { i; };",
+                Object::Integer(10),
+            ),
             ("for (let i = 10; i < 0; i = i + 1) { i; };", Object::Null),
         ];
 
@@ -601,8 +680,8 @@ mod evaluator_tests {
                         return 10;
                     }
                     return 1;
-                }", 
-                Object::Integer(10)
+                }",
+                Object::Integer(10),
             ),
         ];
 
@@ -611,7 +690,6 @@ mod evaluator_tests {
             assert_eq!(evaluated, expected, "{:?}", input);
         }
     }
-
 
     #[test]
     fn test_error_handling() {
@@ -673,7 +751,10 @@ mod evaluator_tests {
             ("let a = 5; a;", Object::Integer(5)),
             ("let a = 5 * 5; a;", Object::Integer(25)),
             ("let a = 5; let b = a; b;", Object::Integer(5)),
-            ("let a = 5; let b = a; let c = a + b + 5; c;", Object::Integer(15)),
+            (
+                "let a = 5; let b = a; let c = a + b + 5; c;",
+                Object::Integer(15),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -697,21 +778,36 @@ mod evaluator_tests {
             Object::Function(params, block, ..) => {
                 assert_eq!(params, vec![identifier("x")]);
                 assert_eq!(format!("{}", block), "(x + 2)");
-            },
-            _ => panic!("expected function object")
+            }
+            _ => panic!("expected function object"),
         }
     }
 
     #[test]
     fn test_function_application() {
         let tests = vec![
-            ("let identity = fn(x) { x; }; identity(5);", Object::Integer(5)),
-            ("let identity = fn(x) { return x; }; identity(5);", Object::Integer(5)),
-            ("let double = fn(x) { x * 2; }; double(5);", Object::Integer(10)),
-            ("let add = fn(x, y) { x + y; }; add(5, 5);", Object::Integer(10)),
-            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", Object::Integer(20)),
+            (
+                "let identity = fn(x) { x; }; identity(5);",
+                Object::Integer(5),
+            ),
+            (
+                "let identity = fn(x) { return x; }; identity(5);",
+                Object::Integer(5),
+            ),
+            (
+                "let double = fn(x) { x * 2; }; double(5);",
+                Object::Integer(10),
+            ),
+            (
+                "let add = fn(x, y) { x + y; }; add(5, 5);",
+                Object::Integer(10),
+            ),
+            (
+                "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+                Object::Integer(20),
+            ),
             ("fn(x) { x; }(5)", Object::Integer(5)),
-            (    
+            (
                 "
                     let newAdder = fn(x) {
                         fn(y) { x + y; };
@@ -734,8 +830,16 @@ mod evaluator_tests {
         let tests = [
             ("len(\"\")", Object::Integer(0)),
             ("len(\"four\")", Object::Integer(4)),
-            ("len(1)", Object::Error("argument 1 not supported by `len`".to_owned())),
-            ("len(\"one\", \"two\")", Object::Error("wrong number of arguments on function `len`. got=2, want=1".to_owned())),
+            (
+                "len(1)",
+                Object::Error("argument 1 not supported by `len`".to_owned()),
+            ),
+            (
+                "len(\"one\", \"two\")",
+                Object::Error(
+                    "wrong number of arguments on function `len`. got=2, want=1".to_owned(),
+                ),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -746,9 +850,14 @@ mod evaluator_tests {
 
     #[test]
     fn test_array_literals() {
-        let tests = [
-            ("[1, 2 * 2, 3 + 3]", Object::Array(vec![Object::Integer(1), Object::Integer(4), Object::Integer(6)])),
-        ];
+        let tests = [(
+            "[1, 2 * 2, 3 + 3]",
+            Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(4),
+                Object::Integer(6),
+            ]),
+        )];
 
         for (input, expected) in tests {
             let evaluated = eval_input(input);
@@ -758,9 +867,8 @@ mod evaluator_tests {
 
     #[test]
     fn test_hash_literals() {
-        let tests = [
-            (
-                "let two = \"two\";
+        let tests = [(
+            "let two = \"two\";
                  {
                     \"one\": 10-9,
                     two: 1 + 1,
@@ -769,16 +877,15 @@ mod evaluator_tests {
                     true: 5,
                     false: 6
                  }",
-                Object::Hash(HashMap::from([
-                    (Object::String("one"), Object::Integer(1)), 
-                    (Object::String("two"), Object::Integer(2)), 
-                    (Object::String("three"), Object::Integer(3)), 
-                    (Object::Integer(4), Object::Integer(4)), 
-                    (Object::Boolean(true), Object::Integer(5)), 
-                    (Object::Boolean(false), Object::Integer(6)), 
-                ]))
-            ),
-        ];
+            Object::Hash(HashMap::from([
+                (Object::String("one"), Object::Integer(1)),
+                (Object::String("two"), Object::Integer(2)),
+                (Object::String("three"), Object::Integer(3)),
+                (Object::Integer(4), Object::Integer(4)),
+                (Object::Boolean(true), Object::Integer(5)),
+                (Object::Boolean(false), Object::Integer(6)),
+            ])),
+        )];
 
         for (input, expected) in tests {
             let evaluated = eval_input(input);
@@ -795,12 +902,18 @@ mod evaluator_tests {
             ("let i = 0; [1][i];", Object::Integer(1)),
             ("[1, 2, 3][1 + 1];", Object::Integer(3)),
             ("let myArray = [1, 2, 3]; myArray[2];", Object::Integer(3)),
-            ("let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", Object::Integer(6)),
-            ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", Object::Integer(2)),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                Object::Integer(6),
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                Object::Integer(2),
+            ),
             ("[1, 2, 3][3]", Object::Null),
             ("[1, 2, 3][-1]", Object::Null),
             ("{\"foo\": 5}[\"foo\"]", Object::Integer(5)),
-            ("{\"foo\": 5}[\"bar\"]",Object::Null),
+            ("{\"foo\": 5}[\"bar\"]", Object::Null),
             ("let key = \"foo\"; {\"foo\": 5}[key]", Object::Integer(5)),
             ("{}[\"foo\"]", Object::Null),
             ("{5: 5}[5]", Object::Integer(5)),
@@ -819,32 +932,32 @@ mod evaluator_tests {
         let tests = [
             ("let i = 1; i = 2; i", Object::Integer(2)),
             ("let i = 1; i = \"hello\"; i", Object::String("hello")),
-            ("i = 1; i", Object::Error("identifier i not found".to_owned())),
             (
-                "let arr = [0, 1, 2]; arr[0] = {}; arr", 
+                "i = 1; i",
+                Object::Error("identifier i not found".to_owned()),
+            ),
+            (
+                "let arr = [0, 1, 2]; arr[0] = {}; arr",
                 Object::Array(vec![
                     Object::Hash(HashMap::new()),
-                    Object::Integer(1), Object::Integer(2)
-                ])
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ]),
             ),
             (
                 "let arr = [0]; arr[0] = [1]; arr",
-                Object::Array(vec![
-                    Object::Array(vec![Object::Integer(1)])
-                ])
+                Object::Array(vec![Object::Array(vec![Object::Integer(1)])]),
             ),
             (
                 "let hash = {1: 1, 2: 2}; hash[1] = 3; hash",
                 Object::Hash(HashMap::from([
                     (Object::Integer(1), Object::Integer(3)),
-                    (Object::Integer(2), Object::Integer(2))
-                ]))
+                    (Object::Integer(2), Object::Integer(2)),
+                ])),
             ),
             (
                 "let hash = {}; hash[\"a\"] = \"b\"; hash",
-                Object::Hash(HashMap::from([
-                    (Object::String("a"), Object::String("b"))
-                ]))
+                Object::Hash(HashMap::from([(Object::String("a"), Object::String("b"))])),
             ),
         ];
 

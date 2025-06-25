@@ -1,7 +1,7 @@
 use crate::token::Token;
 
 #[derive(Eq, PartialEq, Debug, Clone, Hash, PartialOrd)]
-pub struct Identifier { 
+pub struct Identifier {
     pub token: Token,
     pub value: &'static str,
 }
@@ -75,7 +75,7 @@ pub enum Expression {
         body: BlockStatement,
     },
     Call {
-        token: Token, // Token::Lparen
+        token: Token,              // Token::Lparen
         function: Box<Expression>, // Idenifier or Function
         arguments: Vec<Expression>,
     },
@@ -85,13 +85,13 @@ pub enum Expression {
     },
     Hash {
         token: Token,
-        pairs: Vec<(Expression, Expression)>
+        pairs: Vec<(Expression, Expression)>,
     },
     Index {
         token: Token, // Token::Lbracket
         left: Box<Expression>,
         index: Box<Expression>,
-    }
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd)]
@@ -122,7 +122,6 @@ pub enum Precedence {
     Index = 15,      // arr[i]
 }
 
-
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
@@ -139,19 +138,19 @@ impl std::fmt::Display for Statement {
                 }
                 write!(f, ";")?;
                 Ok(())
-            },
+            }
             Statement::Return { value, .. } => {
                 if let Some(value) = value {
                     write!(f, "{}", value)?;
                 }
                 Ok(())
-            },
+            }
             Statement::Expression { expression, .. } => {
                 if let Some(expression) = expression {
                     write!(f, "{}", expression)?;
                 }
                 Ok(())
-            },
+            }
         }
     }
 }
@@ -161,65 +160,117 @@ impl std::fmt::Display for Expression {
         match self {
             Expression::Identifier { value, .. } => write!(f, "{}", value),
             Expression::Integer { value, .. } => write!(f, "{}", value),
-            Expression::String { value, .. }  => write!(f, "{}", value),
+            Expression::String { value, .. } => write!(f, "{}", value),
             Expression::Boolean { value, .. } => write!(f, "{}", value),
-            Expression::Prefix { operator, right, .. } => {
+            Expression::Prefix {
+                operator, right, ..
+            } => {
                 write!(f, "({}{})", operator, right)
-            },
-            Expression::Infix { left, operator, right, .. } => {
+            }
+            Expression::Infix {
+                left,
+                operator,
+                right,
+                ..
+            } => {
                 write!(f, "({} {} {})", left, operator, right)
-            },
-            Expression::If { conditions, alternative, .. } => {
-                write!(f, "{}", conditions
-                    .iter()
-                    .map(|(condition, consequence)| format!("if {} {}", condition, consequence))
-                    .collect::<Vec<String>>()
-                    .join("else "))?;
+            }
+            Expression::If {
+                conditions,
+                alternative,
+                ..
+            } => {
+                write!(
+                    f,
+                    "{}",
+                    conditions
+                        .iter()
+                        .map(|(condition, consequence)| format!("if {} {}", condition, consequence))
+                        .collect::<Vec<String>>()
+                        .join("else ")
+                )?;
                 if let Some(alt) = alternative {
                     write!(f, "else {}", alt)?;
                 }
                 Ok(())
-            },
-            Expression::While { condition, statement, .. } => {
+            }
+            Expression::While {
+                condition,
+                statement,
+                ..
+            } => {
                 write!(f, "while ({}) {}", condition, statement)
-            },
-            Expression::For { declaration, condition, operation, statement, .. } => {
-                write!(f, "for ({}; {}; {}) {}", declaration, condition, operation, statement)
-            },
-            Expression::Function { arguments, body, .. } => {
+            }
+            Expression::For {
+                declaration,
+                condition,
+                operation,
+                statement,
+                ..
+            } => {
+                write!(
+                    f,
+                    "for ({}; {}; {}) {}",
+                    declaration, condition, operation, statement
+                )
+            }
+            Expression::Function {
+                arguments, body, ..
+            } => {
                 write!(f, "fn(")?;
-                write!(f, "{}", arguments
-                    .iter()
-                    .map(|i| format!("{}", i))
-                    .collect::<Vec<String>>()
-                    .join(", ").as_str())?;
+                write!(
+                    f,
+                    "{}",
+                    arguments
+                        .iter()
+                        .map(|i| format!("{}", i))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                        .as_str()
+                )?;
 
                 write!(f, ") {}", body)
-            },
-            Expression::Call { function, arguments, .. } => {
+            }
+            Expression::Call {
+                function,
+                arguments,
+                ..
+            } => {
                 write!(f, "{}(", function)?;
-                write!(f, "{}", arguments
-                    .iter()
-                    .map(|i| format!("{}", i))
-                    .collect::<Vec<String>>()
-                    .join(", "))?;
+                write!(
+                    f,
+                    "{}",
+                    arguments
+                        .iter()
+                        .map(|i| format!("{}", i))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )?;
 
                 write!(f, ")")
-            },
+            }
             Expression::Array { elements, .. } => {
-                write!(f, "[{}]", elements
-                    .iter()
-                    .map(|e| format!("{}", e))
-                    .collect::<Vec<String>>()
-                    .join(", "))
-            },
+                write!(
+                    f,
+                    "[{}]",
+                    elements
+                        .iter()
+                        .map(|e| format!("{}", e))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
             Expression::Hash { pairs, .. } => {
-                write!(f, "{{{}}}", pairs 
-                    .iter()
-                    .map(|(k, v)| format!("{}: {}", k, v))
-                    .collect::<Vec<String>>()
-                    .join(", "))
-            },
+                write!(
+                    f,
+                    "{{{}}}",
+                    pairs
+                        .iter()
+                        .map(|(k, v)| format!("{}: {}", k, v))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
             Expression::Index { left, index, .. } => {
                 write!(f, "({}[{}])", left, index)
             }

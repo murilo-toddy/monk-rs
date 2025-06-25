@@ -1,5 +1,5 @@
-use std::str;
 use crate::token::*;
+use std::str;
 
 // TODO keep track of file, line and column for better error reporting
 pub struct Lexer<'a> {
@@ -44,7 +44,11 @@ impl<'a> Lexer<'a> {
         while Self::is_letter(self.ch) {
             self.read_char();
         }
-        return Box::leak(String::from_utf8(self.input[start_pos..self.position].to_vec()).expect("should be valid UTF8").into_boxed_str());
+        return Box::leak(
+            String::from_utf8(self.input[start_pos..self.position].to_vec())
+                .expect("should be valid UTF8")
+                .into_boxed_str(),
+        );
     }
 
     fn read_integer(&mut self) -> i64 {
@@ -55,20 +59,24 @@ impl<'a> Lexer<'a> {
         return str::from_utf8(self.input[start_pos..self.position].as_ref())
             .unwrap()
             .parse()
-            .expect("should be valid integer")
+            .expect("should be valid integer");
     }
 
     fn read_string(&mut self) -> &'static str {
         let position = self.position + 1;
-        loop { 
+        loop {
             self.read_char();
             if self.ch as char == '"' || self.ch == 0 {
-                break
+                break;
             }
         }
-        Box::leak(String::from_utf8(self.input[position .. self.position].to_vec()).expect("should be valid UTF8").into_boxed_str())
+        Box::leak(
+            String::from_utf8(self.input[position..self.position].to_vec())
+                .expect("should be valid UTF8")
+                .into_boxed_str(),
+        )
     }
-    
+
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
@@ -79,7 +87,7 @@ impl<'a> Lexer<'a> {
         for (ch, eq_token) in char_tokens {
             if (self.peek_char() as char) == ch {
                 self.read_char();
-                return eq_token
+                return eq_token;
             }
         }
         fallback
@@ -93,8 +101,14 @@ impl<'a> Lexer<'a> {
             '!' => self.compare_peek(vec![('=', Token::Neq)], Token::Bang),
             '&' => self.compare_peek(vec![('&', Token::And)], Token::BitAnd),
             '|' => self.compare_peek(vec![('|', Token::Or)], Token::BitOr),
-            '>' => self.compare_peek(vec![('>', Token::BitShiftRight), ('=', Token::Gte)], Token::Gt),
-            '<' => self.compare_peek(vec![('<', Token::BitShiftLeft), ('=', Token::Lte)], Token::Lt),
+            '>' => self.compare_peek(
+                vec![('>', Token::BitShiftRight), ('=', Token::Gte)],
+                Token::Gt,
+            ),
+            '<' => self.compare_peek(
+                vec![('<', Token::BitShiftLeft), ('=', Token::Lte)],
+                Token::Lt,
+            ),
             '^' => Token::BitXor,
             '+' => Token::Plus,
             '-' => Token::Minus,
@@ -119,7 +133,7 @@ impl<'a> Lexer<'a> {
                 } else {
                     Token::Illegal(self.ch as char)
                 }
-            },
+            }
         };
         self.read_char();
         token
@@ -174,7 +188,8 @@ x ^ y
 x << y
 x >> y
 x % y
-".as_bytes();
+"
+        .as_bytes();
 
         let tests = vec![
             Token::Let,
@@ -334,8 +349,11 @@ x % y
         let mut l = Lexer::new(input);
         for (i, tt) in tests.iter().enumerate() {
             let token = l.next_token();
-            assert_eq!(token, *tt, "tests[{}] - wrong token type. expected={:?}, got={:?}", i, tt, token);
+            assert_eq!(
+                token, *tt,
+                "tests[{}] - wrong token type. expected={:?}, got={:?}",
+                i, tt, token
+            );
         }
     }
 }
-

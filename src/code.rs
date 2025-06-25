@@ -118,7 +118,10 @@ pub struct Definition {
 }
 
 pub fn generate_definition(name: &'static str, operand_widths: Vec<usize>) -> Option<Definition> {
-    Some(Definition { name, operand_widths })
+    Some(Definition {
+        name,
+        operand_widths,
+    })
 }
 
 pub fn get_definition(opcode: &Opcode) -> Option<Definition> {
@@ -186,7 +189,10 @@ fn read_operands(def: &Definition, instructions: Instructions) -> (Vec<i64>, i64
     for (i, width) in def.operand_widths.iter().enumerate() {
         match width {
             1 => operands[i] = instructions[offset] as i64,
-            2 => operands[i] = u16::from_be_bytes(instructions[offset..offset + 2].try_into().unwrap()) as i64,
+            2 => {
+                operands[i] =
+                    u16::from_be_bytes(instructions[offset..offset + 2].try_into().unwrap()) as i64
+            }
             _ => {}
         }
         offset += width;
@@ -262,8 +268,16 @@ mod code_tests {
                 vec![Opcode::Constant as u8, 255 as u8, 254 as u8],
             ),
             (Opcode::Add, vec![], vec![Opcode::Add as u8]),
-            (Opcode::GetLocal, vec![255], vec![Opcode::GetLocal as u8, 255]),
-            (Opcode::Closure, vec![65534, 255], vec![Opcode::Closure as u8, 255 as u8, 254 as u8, 255 as u8]),
+            (
+                Opcode::GetLocal,
+                vec![255],
+                vec![Opcode::GetLocal as u8, 255],
+            ),
+            (
+                Opcode::Closure,
+                vec![65534, 255],
+                vec![Opcode::Closure as u8, 255 as u8, 254 as u8, 255 as u8],
+            ),
         ];
         for (op, operands, expected) in tests {
             let instruction = make(op, operands);

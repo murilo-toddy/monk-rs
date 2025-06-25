@@ -1,5 +1,7 @@
+use crate::{
+    compiler::Compiler, environment::Environment, evaluator::Evaluator, lexer, parser, vm::Vm,
+};
 use std::io::{self, BufRead, Write};
-use crate::{compiler::Compiler, environment::Environment, evaluator::Evaluator, lexer, parser, vm::Vm};
 
 enum ExecutionMode {
     Interpreted,
@@ -7,7 +9,9 @@ enum ExecutionMode {
 }
 
 fn print_parse_errors<W>(output: &mut W, errors: &Vec<parser::ParseError>) -> io::Result<()>
-where W: Write {
+where
+    W: Write,
+{
     for error in errors {
         output.write_all(format!("{}", error).as_bytes())?;
     }
@@ -79,4 +83,3 @@ where
     }
     Ok(())
 }
-

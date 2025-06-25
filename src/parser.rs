@@ -1,8 +1,8 @@
 use std::fmt;
 
+use crate::ast::*;
 use crate::lexer::Lexer;
 use crate::token::Token;
-use crate::ast::*;
 
 #[derive(Debug, Clone)]
 pub struct ParseError {
@@ -30,7 +30,7 @@ impl<'a> Parser<'a> {
             peek_token: Token::Eof,
             errors: vec![],
         };
-        
+
         // set current and peek tokens
         parser.next();
         parser.next();
@@ -60,14 +60,16 @@ impl<'a> Parser<'a> {
     }
 
     fn push_parse_error(&mut self, message: &str) {
-        self.errors.push(ParseError { message: message.to_owned() })
+        self.errors.push(ParseError {
+            message: message.to_owned(),
+        })
     }
 
     fn peek_error(&mut self, expected_token: &Token) {
-        self.push_parse_error(
-            &format!("unexpected '{:?}', should be {:?}", 
-                    self.peek_token, expected_token)
-        );
+        self.push_parse_error(&format!(
+            "unexpected '{:?}', should be {:?}",
+            self.peek_token, expected_token
+        ));
     }
 
     pub fn get_errors(&self) -> &Vec<ParseError> {
@@ -89,7 +91,7 @@ impl<'a> Parser<'a> {
             Token::BitShiftLeft | Token::BitShiftRight => Precedence::BitShift,
             Token::Eq | Token::Neq => Precedence::Equals,
             Token::Assign => Precedence::Assign,
-            _ => Precedence::Lowest
+            _ => Precedence::Lowest,
         }
     }
 
@@ -129,7 +131,7 @@ impl<'a> Parser<'a> {
                     token: self.current_token.clone(),
                     value,
                 }
-            },
+            }
             _ => return None,
         };
 
@@ -143,7 +145,11 @@ impl<'a> Parser<'a> {
             self.next();
         }
 
-        Some(Statement::Let { name: identifier, token, value })
+        Some(Statement::Let {
+            name: identifier,
+            token,
+            value,
+        })
     }
 
     fn parse_return_statement(&mut self) -> Option<Statement> {
@@ -181,7 +187,10 @@ impl<'a> Parser<'a> {
 
     fn parse_array_literal(&mut self) -> Option<Expression> {
         let elements = self.parse_expression_list(Token::Rbracket)?;
-        Some(Expression::Array { token: Token::Lbracket, elements })
+        Some(Expression::Array {
+            token: Token::Lbracket,
+            elements,
+        })
     }
 
     fn parse_hash_literal(&mut self) -> Option<Expression> {
@@ -202,7 +211,10 @@ impl<'a> Parser<'a> {
         if !self.expect_peek(&Token::Rbrace) {
             return None;
         }
-        Some(Expression::Hash { token: Token::Lbrace, pairs })
+        Some(Expression::Hash {
+            token: Token::Lbrace,
+            pairs,
+        })
     }
 
     fn parse_index_expression(&mut self, left: Expression) -> Option<Expression> {
@@ -210,9 +222,13 @@ impl<'a> Parser<'a> {
         self.next();
         let index = self.parse_expression(Precedence::Lowest)?;
         if !self.expect_peek(&Token::Rbracket) {
-            return None
+            return None;
         }
-        Some(Expression::Index { token, left: Box::new(left), index: Box::new(index) })
+        Some(Expression::Index {
+            token,
+            left: Box::new(left),
+            index: Box::new(index),
+        })
     }
 
     fn parse_reassign_expression(&mut self, left: Expression) -> Option<Expression> {
@@ -227,7 +243,7 @@ impl<'a> Parser<'a> {
                     left: Box::from(left),
                     right: Box::from(right),
                 })
-            },
+            }
             _ => {
                 self.push_parse_error("left value of = is not identifier");
                 None
@@ -251,11 +267,12 @@ impl<'a> Parser<'a> {
             Token::True | Token::False => self.parse_boolean(),
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             _ => {
-                self.push_parse_error(
-                     &format!("cannot parse expression, unexpected {}", self.current_token.as_string())
-                );
-                return None
-            },
+                self.push_parse_error(&format!(
+                    "cannot parse expression, unexpected {}",
+                    self.current_token.as_string()
+                ));
+                return None;
+            }
         };
 
         while !self.peek_token_is(&Token::Semicolon) && precedence < self.peek_precedence() {
@@ -281,19 +298,19 @@ impl<'a> Parser<'a> {
                 | Token::Gte => {
                     self.next();
                     self.parse_infix_expression(left_expression?)
-                },
+                }
                 Token::Lparen => {
                     self.next();
                     self.parse_call_expression(left_expression?)
-                },
+                }
                 Token::Lbracket => {
                     self.next();
                     self.parse_index_expression(left_expression?)
-                },
+                }
                 Token::Assign => {
                     self.next();
                     self.parse_reassign_expression(left_expression?)
-                },
+                }
                 _ => {
                     return left_expression;
                 }
@@ -307,10 +324,10 @@ impl<'a> Parser<'a> {
         if !self.expect_peek(&Token::Lparen) {
             return None;
         }
-        
+
         let arguments = self.parse_function_arguments();
         if !self.expect_peek(&Token::Lbrace) {
-            return None
+            return None;
         }
         let body = self.parse_block_statement();
 
@@ -348,8 +365,7 @@ impl<'a> Parser<'a> {
             if self.peek_token_is(&Token::If) {
                 self.next();
                 conditions.push(self.parse_if_branch()?);
-            }
-            else {
+            } else {
                 if !self.expect_peek(&Token::Lbrace) {
                     return None;
                 }
@@ -408,7 +424,7 @@ impl<'a> Parser<'a> {
         if !self.expect_peek(&Token::Lbrace) {
             return None;
         }
-        
+
         Some(Expression::For {
             token: current_token,
             declaration: Box::from(declaration),
@@ -462,7 +478,6 @@ impl<'a> Parser<'a> {
         Some(identifiers)
     }
 
-
     fn parse_block_statement(&mut self) -> BlockStatement {
         let current_token = self.current_token.clone();
         self.next();
@@ -485,10 +500,11 @@ impl<'a> Parser<'a> {
         let value = match &self.current_token {
             Token::Identifier(value) => value,
             _ => {
-                self.push_parse_error(
-                    &format!("expected identifier, but got {}", self.current_token.as_string())
-                );
-                return None
+                self.push_parse_error(&format!(
+                    "expected identifier, but got {}",
+                    self.current_token.as_string()
+                ));
+                return None;
             }
         };
         Some(Expression::Identifier {
@@ -501,10 +517,11 @@ impl<'a> Parser<'a> {
         let value = match self.current_token {
             Token::Integer(value) => value,
             _ => {
-                self.push_parse_error(
-                    &format!("expected integer, but got {}", self.current_token.as_string())
-                );
-                return None
+                self.push_parse_error(&format!(
+                    "expected integer, but got {}",
+                    self.current_token.as_string()
+                ));
+                return None;
             }
         };
         Some(Expression::Integer {
@@ -517,9 +534,10 @@ impl<'a> Parser<'a> {
         let value = match &self.current_token {
             Token::String(value) => value,
             _ => {
-                self.push_parse_error(
-                    &format!("expected string, but got {}", self.current_token.as_string())
-                );
+                self.push_parse_error(&format!(
+                    "expected string, but got {}",
+                    self.current_token.as_string()
+                ));
                 return None;
             }
         };
@@ -539,7 +557,7 @@ impl<'a> Parser<'a> {
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
         let current_token = self.current_token.clone();
         self.next();
-        
+
         Some(Expression::Prefix {
             token: current_token.clone(),
             operator: current_token.as_string().to_string(),
@@ -585,7 +603,7 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod parser_tests {
     use super::*;
-    
+
     fn check_parse_errors(p: Parser) {
         let errors = p.get_errors();
         if errors.len() == 0 {
@@ -639,8 +657,9 @@ mod parser_tests {
     fn test_let_statements() {
         let input = "let x = 5;
             let y = true;
-            let foobar = y;".as_bytes();
-        
+            let foobar = y;"
+            .as_bytes();
+
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -650,17 +669,26 @@ mod parser_tests {
             Program(vec![
                 Statement::Let {
                     token: Token::Let,
-                    name: Identifier { token: Token::Identifier("x"), value: "x" },
+                    name: Identifier {
+                        token: Token::Identifier("x"),
+                        value: "x"
+                    },
                     value: Some(integer(5)),
                 },
                 Statement::Let {
                     token: Token::Let,
-                    name: Identifier { token: Token::Identifier("y"), value: "y" },
+                    name: Identifier {
+                        token: Token::Identifier("y"),
+                        value: "y"
+                    },
                     value: Some(boolean(true)),
                 },
                 Statement::Let {
                     token: Token::Let,
-                    name: Identifier { token: Token::Identifier("foobar"), value: "foobar" },
+                    name: Identifier {
+                        token: Token::Identifier("foobar"),
+                        value: "foobar"
+                    },
                     value: Some(identifier("y")),
                 },
             ]),
@@ -672,8 +700,9 @@ mod parser_tests {
     fn test_return_statements() {
         let input = "return 5;
             return false;
-            return xy;".as_bytes();
-        
+            return xy;"
+            .as_bytes();
+
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -685,7 +714,7 @@ mod parser_tests {
                     token: Token::Return,
                     value: Some(integer(5)),
                 },
-                Statement::Return{
+                Statement::Return {
                     token: Token::Return,
                     value: Some(boolean(false)),
                 },
@@ -702,19 +731,17 @@ mod parser_tests {
     fn test_identifier_expression() {
         let input = "foobar;".as_bytes();
         let expected_value = "foobar";
-        
+
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
-                    token: Token::Identifier(expected_value),
-                    expression: Some(identifier(expected_value)),
-                },
-            ]),
+            Program(vec![Statement::Expression {
+                token: Token::Identifier(expected_value),
+                expression: Some(identifier(expected_value)),
+            },]),
             program
         );
     }
@@ -722,19 +749,17 @@ mod parser_tests {
     #[test]
     fn test_integer_literal_expression() {
         let input = "5;".as_bytes();
-        
+
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
-                    token: Token::Integer(5),
-                    expression: Some(integer(5)),
-                },
-            ]),
+            Program(vec![Statement::Expression {
+                token: Token::Integer(5),
+                expression: Some(integer(5)),
+            },]),
             program
         );
     }
@@ -742,7 +767,7 @@ mod parser_tests {
     #[test]
     fn test_boolean_expression() {
         let input = "true; false;".as_bytes();
-        
+
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -768,30 +793,26 @@ mod parser_tests {
         let tests = vec![
             (
                 "!5;",
-                Program(vec![
-                    Statement::Expression {
+                Program(vec![Statement::Expression {
+                    token: Token::Bang,
+                    expression: Some(Expression::Prefix {
                         token: Token::Bang,
-                        expression: Some(Expression::Prefix {
-                            token: Token::Bang,
-                            operator: "!".to_owned(),
-                            right: Box::new(integer(5)),
-                        })
-                    },
-                ]),
+                        operator: "!".to_owned(),
+                        right: Box::new(integer(5)),
+                    }),
+                }]),
             ),
             (
                 "-15;",
-                Program(vec![
-                    Statement::Expression {
+                Program(vec![Statement::Expression {
+                    token: Token::Minus,
+                    expression: Some(Expression::Prefix {
                         token: Token::Minus,
-                        expression: Some(Expression::Prefix {
-                            token: Token::Minus,
-                            operator: "-".to_owned(),
-                            right: Box::new(integer(15)),
-                        })
-                    },
-                ]),
-            )
+                        operator: "-".to_owned(),
+                        right: Box::new(integer(15)),
+                    }),
+                }]),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -813,7 +834,12 @@ mod parser_tests {
         }
     }
 
-    fn infix_template(left: Expression, op: &'static str, op_token: Token, right: Expression) -> Statement {
+    fn infix_template(
+        left: Expression,
+        op: &'static str,
+        op_token: Token,
+        right: Expression,
+    ) -> Statement {
         let token = token_from_expression(&left);
         Statement::Expression {
             token,
@@ -822,7 +848,7 @@ mod parser_tests {
                 operator: op,
                 left: Box::new(left),
                 right: Box::new(right),
-            })
+            }),
         }
     }
 
@@ -834,34 +860,104 @@ mod parser_tests {
                 operator: op,
                 left: Box::new(integer(left)),
                 right: Box::new(integer(right)),
-            })
+            }),
         }
     }
 
     #[test]
     fn test_infix_expression() {
         let tests = vec![
-            ("5 + 5;", Program(vec![int_infix_template(5, "+", Token::Plus, 5)])),
-            ("5 - 5;", Program(vec![int_infix_template(5, "-", Token::Minus, 5)])),
-            ("5 * 5;", Program(vec![int_infix_template(5, "*", Token::Asterisk, 5)])),
-            ("5 / 5;", Program(vec![int_infix_template(5, "/", Token::Slash, 5)])),
-            ("5 % 5;", Program(vec![int_infix_template(5, "%", Token::Percentage, 5)])),
-            ("5 > 5;", Program(vec![int_infix_template(5, ">", Token::Gt, 5)])),
-            ("5 >= 5;", Program(vec![int_infix_template(5, ">=", Token::Gte, 5)])),
-            ("5 < 5;", Program(vec![int_infix_template(5, "<", Token::Lt, 5)])),
-            ("5 <= 5;", Program(vec![int_infix_template(5, "<=", Token::Lte, 5)])),
-            ("5 == 5;", Program(vec![int_infix_template(5, "==", Token::Eq, 5)])),
-            ("5 != 5;", Program(vec![int_infix_template(5, "!=", Token::Neq, 5)])),
-            ("5 & 5;", Program(vec![int_infix_template(5, "&", Token::BitAnd, 5)])),
-            ("5 && 5;", Program(vec![int_infix_template(5, "&&", Token::And, 5)])),
-            ("5 | 5;", Program(vec![int_infix_template(5, "|", Token::BitOr, 5)])),
-            ("5 || 5;", Program(vec![int_infix_template(5, "||", Token::Or, 5)])),
-            ("5 ^ 5;", Program(vec![int_infix_template(5, "^", Token::BitXor, 5)])),
-            ("5 << 5;", Program(vec![int_infix_template(5, "<<", Token::BitShiftLeft, 5)])),
-            ("5 >> 5;", Program(vec![int_infix_template(5, ">>", Token::BitShiftRight, 5)])),
-            ("value = 5;", Program(vec![infix_template(identifier("value"), "=", Token::Assign, integer(5))])),
-            ("value[1] = 5;", Program(vec![infix_template(index(identifier("value"), integer(1)), "=", Token::Assign, integer(5))])),
-        ]; 
+            (
+                "5 + 5;",
+                Program(vec![int_infix_template(5, "+", Token::Plus, 5)]),
+            ),
+            (
+                "5 - 5;",
+                Program(vec![int_infix_template(5, "-", Token::Minus, 5)]),
+            ),
+            (
+                "5 * 5;",
+                Program(vec![int_infix_template(5, "*", Token::Asterisk, 5)]),
+            ),
+            (
+                "5 / 5;",
+                Program(vec![int_infix_template(5, "/", Token::Slash, 5)]),
+            ),
+            (
+                "5 % 5;",
+                Program(vec![int_infix_template(5, "%", Token::Percentage, 5)]),
+            ),
+            (
+                "5 > 5;",
+                Program(vec![int_infix_template(5, ">", Token::Gt, 5)]),
+            ),
+            (
+                "5 >= 5;",
+                Program(vec![int_infix_template(5, ">=", Token::Gte, 5)]),
+            ),
+            (
+                "5 < 5;",
+                Program(vec![int_infix_template(5, "<", Token::Lt, 5)]),
+            ),
+            (
+                "5 <= 5;",
+                Program(vec![int_infix_template(5, "<=", Token::Lte, 5)]),
+            ),
+            (
+                "5 == 5;",
+                Program(vec![int_infix_template(5, "==", Token::Eq, 5)]),
+            ),
+            (
+                "5 != 5;",
+                Program(vec![int_infix_template(5, "!=", Token::Neq, 5)]),
+            ),
+            (
+                "5 & 5;",
+                Program(vec![int_infix_template(5, "&", Token::BitAnd, 5)]),
+            ),
+            (
+                "5 && 5;",
+                Program(vec![int_infix_template(5, "&&", Token::And, 5)]),
+            ),
+            (
+                "5 | 5;",
+                Program(vec![int_infix_template(5, "|", Token::BitOr, 5)]),
+            ),
+            (
+                "5 || 5;",
+                Program(vec![int_infix_template(5, "||", Token::Or, 5)]),
+            ),
+            (
+                "5 ^ 5;",
+                Program(vec![int_infix_template(5, "^", Token::BitXor, 5)]),
+            ),
+            (
+                "5 << 5;",
+                Program(vec![int_infix_template(5, "<<", Token::BitShiftLeft, 5)]),
+            ),
+            (
+                "5 >> 5;",
+                Program(vec![int_infix_template(5, ">>", Token::BitShiftRight, 5)]),
+            ),
+            (
+                "value = 5;",
+                Program(vec![infix_template(
+                    identifier("value"),
+                    "=",
+                    Token::Assign,
+                    integer(5),
+                )]),
+            ),
+            (
+                "value[1] = 5;",
+                Program(vec![infix_template(
+                    index(identifier("value"), integer(1)),
+                    "=",
+                    Token::Assign,
+                    integer(5),
+                )]),
+            ),
+        ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
             let mut parser = Parser::new(lexer);
@@ -871,7 +967,7 @@ mod parser_tests {
             assert_eq!(expected, program);
         }
     }
- 
+
     #[test]
     fn test_if_statement() {
         let input = "if (x < y) { x }".as_bytes();
@@ -885,28 +981,24 @@ mod parser_tests {
                 token: Token::If,
                 expression: Some(Expression::If {
                     token: Token::If,
-                    conditions: vec![
-                        (
-                            Expression::Infix {
-                                token: Token::Lt,
-                                operator: "<",
-                                left: Box::new(identifier("x")),
-                                right: Box::new(identifier("y")),
-                            },
-                            BlockStatement {
-                                token: Token::Lbrace,
-                                statements: vec![
-                                    Statement::Expression {
-                                        token: Token::Identifier("x"), 
-                                        expression: Some(identifier("x")),
-                                    },
-                                ],
-                            }
-                        )
-                    ],
+                    conditions: vec![(
+                        Expression::Infix {
+                            token: Token::Lt,
+                            operator: "<",
+                            left: Box::new(identifier("x")),
+                            right: Box::new(identifier("y")),
+                        },
+                        BlockStatement {
+                            token: Token::Lbrace,
+                            statements: vec![Statement::Expression {
+                                token: Token::Identifier("x"),
+                                expression: Some(identifier("x")),
+                            },],
+                        }
+                    )],
                     alternative: None,
                 })
-           }]),
+            }]),
             program
         );
     }
@@ -932,12 +1024,10 @@ mod parser_tests {
                     }),
                     statement: BlockStatement {
                         token: Token::Lbrace,
-                        statements: vec![
-                            Statement::Expression {
-                                token: Token::Identifier("x"), 
-                                expression: Some(identifier("x")),
-                            },
-                        ],
+                        statements: vec![Statement::Expression {
+                            token: Token::Identifier("x"),
+                            expression: Some(identifier("x")),
+                        },],
                     },
                 })
             }]),
@@ -988,19 +1078,17 @@ mod parser_tests {
                     }),
                     statement: BlockStatement {
                         token: Token::Lbrace,
-                        statements: vec![
-                            Statement::Expression {
-                                token: Token::Identifier("x"), 
-                                expression: Some(identifier("x")),
-                            },
-                        ],
+                        statements: vec![Statement::Expression {
+                            token: Token::Identifier("x"),
+                            expression: Some(identifier("x")),
+                        },],
                     },
                 })
             }]),
             program
         );
     }
- 
+
     #[test]
     fn test_if_else_statement() {
         let input = "if (x < y) { x } else if (x > y) { y } else { z }".as_bytes();
@@ -1024,12 +1112,10 @@ mod parser_tests {
                             },
                             BlockStatement {
                                 token: Token::Lbrace,
-                                statements: vec![
-                                    Statement::Expression {
-                                        token: Token::Identifier("x"), 
-                                        expression: Some(identifier("x")),
-                                    },
-                                ],
+                                statements: vec![Statement::Expression {
+                                    token: Token::Identifier("x"),
+                                    expression: Some(identifier("x")),
+                                },],
                             },
                         ),
                         (
@@ -1041,26 +1127,22 @@ mod parser_tests {
                             },
                             BlockStatement {
                                 token: Token::Lbrace,
-                                statements: vec![
-                                    Statement::Expression {
-                                        token: Token::Identifier("y"), 
-                                        expression: Some(identifier("y")),
-                                    },
-                                ],
+                                statements: vec![Statement::Expression {
+                                    token: Token::Identifier("y"),
+                                    expression: Some(identifier("y")),
+                                },],
                             },
                         ),
                     ],
                     alternative: Some(BlockStatement {
                         token: Token::Lbrace,
-                        statements: vec![
-                            Statement::Expression {
-                                token: Token::Identifier("z"), 
-                                expression: Some(identifier("z")),
-                            },
-                        ],
+                        statements: vec![Statement::Expression {
+                            token: Token::Identifier("z"),
+                            expression: Some(identifier("z")),
+                        },],
                     }),
                 })
-           }]),
+            }]),
             program
         );
     }
@@ -1074,32 +1156,34 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
+            Program(vec![Statement::Expression {
+                token: Token::Function,
+                expression: Some(Expression::Function {
                     token: Token::Function,
-                    expression: Some(Expression::Function {
-                        token: Token::Function,
-                        arguments: vec![
-                            Identifier { token: Token::Identifier("x"), value: "x" },
-                            Identifier { token: Token::Identifier("y"), value: "y" },
-                        ],
-                        body: BlockStatement {
-                            token: Token::Lbrace,
-                            statements: vec![
-                                Statement::Expression {
-                                    token: Token::Identifier("x"),
-                                    expression: Some(Expression::Infix {
-                                        token: Token::Plus,
-                                        operator: "+",
-                                        left: Box::new(identifier("x")),
-                                        right: Box::new(identifier("y")),
-                                    })
-                                }
-                            ],
-                        }
-                    }),
-                }
-            ]),
+                    arguments: vec![
+                        Identifier {
+                            token: Token::Identifier("x"),
+                            value: "x"
+                        },
+                        Identifier {
+                            token: Token::Identifier("y"),
+                            value: "y"
+                        },
+                    ],
+                    body: BlockStatement {
+                        token: Token::Lbrace,
+                        statements: vec![Statement::Expression {
+                            token: Token::Identifier("x"),
+                            expression: Some(Expression::Infix {
+                                token: Token::Plus,
+                                operator: "+",
+                                left: Box::new(identifier("x")),
+                                right: Box::new(identifier("y")),
+                            })
+                        }],
+                    }
+                }),
+            }]),
             program
         );
     }
@@ -1113,30 +1197,31 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
-                    token: Token::Identifier("add"),
-                    expression: Some(Expression::Call {
-                        token: Token::Lparen,
-                        function: Box::new(identifier("add")),
-                        arguments: vec![
-                            Expression::Integer { token: Token::Integer(1), value: 1 },
-                            Expression::Infix {
-                                token: Token::Asterisk,
-                                operator: "*",
-                                left: Box::new(integer(2)),
-                                right: Box::new(integer(3)),
-                            },
-                            Expression::Infix {
-                                token: Token::Plus,
-                                operator: "+",
-                                left: Box::new(integer(4)),
-                                right: Box::new(integer(5)),
-                            },
-                        ],
-                    }),
-                }
-            ]),
+            Program(vec![Statement::Expression {
+                token: Token::Identifier("add"),
+                expression: Some(Expression::Call {
+                    token: Token::Lparen,
+                    function: Box::new(identifier("add")),
+                    arguments: vec![
+                        Expression::Integer {
+                            token: Token::Integer(1),
+                            value: 1
+                        },
+                        Expression::Infix {
+                            token: Token::Asterisk,
+                            operator: "*",
+                            left: Box::new(integer(2)),
+                            right: Box::new(integer(3)),
+                        },
+                        Expression::Infix {
+                            token: Token::Plus,
+                            operator: "+",
+                            left: Box::new(integer(4)),
+                            right: Box::new(integer(5)),
+                        },
+                    ],
+                }),
+            }]),
             program
         );
     }
@@ -1144,7 +1229,7 @@ mod parser_tests {
     #[test]
     fn test_operator_precedence() {
         let tests = vec![
-    		("-a * b", "((-a) * b)"),
+            ("-a * b", "((-a) * b)"),
             ("!-a", "(!(-a))"),
             ("a + b + c", "((a + b) + c)"),
             ("a + b - c", "((a + b) - c)"),
@@ -1155,7 +1240,10 @@ mod parser_tests {
             ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
             ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
             ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
-            ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
             ("true", "true"),
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
@@ -1172,10 +1260,22 @@ mod parser_tests {
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
             ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
-            ("add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))", "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))"),
-            ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"),
-            ("a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"),
-            ("add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1, 2][1])",
+                "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            ),
         ];
         for (input, expected) in tests {
             let lexer = Lexer::new(input.as_bytes());
@@ -1189,14 +1289,13 @@ mod parser_tests {
 
     #[test]
     fn test_string() {
-        let program = Program(vec![
-            Statement::Let {
-                token: Token::Let,
-                name: Identifier {
-                    token: Token::Identifier("my_var"),
-                    value: "my_var",
-                },
-                value: Some(identifier("another_var")),
+        let program = Program(vec![Statement::Let {
+            token: Token::Let,
+            name: Identifier {
+                token: Token::Identifier("my_var"),
+                value: "my_var",
+            },
+            value: Some(identifier("another_var")),
         }]);
         assert_eq!(format!("{}", program), "let my_var = another_var;")
     }
@@ -1210,15 +1309,13 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
+            Program(vec![Statement::Expression {
+                token: Token::String("hello world"),
+                expression: Some(Expression::String {
                     token: Token::String("hello world"),
-                    expression: Some(Expression::String { 
-                        token: Token::String("hello world"),
-                        value: "hello world",
-                    }),
-                }
-            ]),
+                    value: "hello world",
+                }),
+            }]),
             program
         );
     }
@@ -1232,32 +1329,30 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
+            Program(vec![Statement::Expression {
+                token: Token::Lbracket,
+                expression: Some(Expression::Array {
                     token: Token::Lbracket,
-                    expression: Some(Expression::Array { 
-                        token: Token::Lbracket,
-                        elements: vec![
-                            Expression::Integer {
-                                token: Token::Integer(1),
-                                value: 1,
-                            },
-                            Expression::Infix {
-                                token: Token::Asterisk,
-                                operator: "*",
-                                left: Box::new(integer(2)),
-                                right: Box::new(integer(2)),
-                            },
-                            Expression::Infix {
-                                token: Token::Plus,
-                                operator: "+",
-                                left: Box::new(integer(3)),
-                                right: Box::new(integer(3)),
-                            },
-                        ],
-                    }),
-                }
-            ]),
+                    elements: vec![
+                        Expression::Integer {
+                            token: Token::Integer(1),
+                            value: 1,
+                        },
+                        Expression::Infix {
+                            token: Token::Asterisk,
+                            operator: "*",
+                            left: Box::new(integer(2)),
+                            right: Box::new(integer(2)),
+                        },
+                        Expression::Infix {
+                            token: Token::Plus,
+                            operator: "+",
+                            left: Box::new(integer(3)),
+                            right: Box::new(integer(3)),
+                        },
+                    ],
+                }),
+            }]),
             program
         );
     }
@@ -1271,15 +1366,13 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
+            Program(vec![Statement::Expression {
+                token: Token::Lbrace,
+                expression: Some(Expression::Hash {
                     token: Token::Lbrace,
-                    expression: Some(Expression::Hash { 
-                        token: Token::Lbrace,
-                        pairs: vec![],
-                    }),
-                }
-            ]),
+                    pairs: vec![],
+                }),
+            }]),
             program
         );
     }
@@ -1293,18 +1386,13 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
+            Program(vec![Statement::Expression {
+                token: Token::Lbrace,
+                expression: Some(Expression::Hash {
                     token: Token::Lbrace,
-                    expression: Some(Expression::Hash { 
-                        token: Token::Lbrace,
-                        pairs: vec![
-                            (string("one"), integer(1)),
-                            (string("two"), integer(2)),
-                        ],
-                    }),
-                }
-            ]),
+                    pairs: vec![(string("one"), integer(1)), (string("two"), integer(2)),],
+                }),
+            }]),
             program
         );
     }
@@ -1318,43 +1406,41 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
+            Program(vec![Statement::Expression {
+                token: Token::Lbrace,
+                expression: Some(Expression::Hash {
                     token: Token::Lbrace,
-                    expression: Some(Expression::Hash { 
-                        token: Token::Lbrace,
-                        pairs: vec![
-                            (
-                                string("one"),
-                                Expression::Infix {
-                                    token: Token::Plus,
-                                    operator: "+",
-                                    left: Box::new(integer(0)),
-                                    right: Box::new(integer(1)),
-                                },
-                            ),
-                            (
-                                string("two"), 
-                                Expression::Infix {
-                                    token: Token::Minus,
-                                    operator: "-",
-                                    left: Box::new(integer(10)),
-                                    right: Box::new(integer(8)),
-                                },
-                            ),
-                            (
-                                boolean(true), 
-                                Expression::Infix {
-                                    token: Token::Slash,
-                                    operator: "/",
-                                    left: Box::new(integer(15)),
-                                    right: Box::new(integer(5)),
-                                },
-                            ),
-                        ],
-                    }),
-                }
-            ]),
+                    pairs: vec![
+                        (
+                            string("one"),
+                            Expression::Infix {
+                                token: Token::Plus,
+                                operator: "+",
+                                left: Box::new(integer(0)),
+                                right: Box::new(integer(1)),
+                            },
+                        ),
+                        (
+                            string("two"),
+                            Expression::Infix {
+                                token: Token::Minus,
+                                operator: "-",
+                                left: Box::new(integer(10)),
+                                right: Box::new(integer(8)),
+                            },
+                        ),
+                        (
+                            boolean(true),
+                            Expression::Infix {
+                                token: Token::Slash,
+                                operator: "/",
+                                left: Box::new(integer(15)),
+                                right: Box::new(integer(5)),
+                            },
+                        ),
+                    ],
+                }),
+            }]),
             program
         );
     }
@@ -1368,26 +1454,23 @@ mod parser_tests {
         check_parse_errors(parser);
 
         assert_eq!(
-            Program(vec![
-                Statement::Expression {
-                    token: Token::Identifier("myArray"),
-                    expression: Some(Expression::Index { 
-                        token: Token::Lbracket,
-                        left: Box::new(Expression::Identifier { 
-                            token: Token::Identifier("myArray"),
-                            value: "myArray"
-                        }),
-                        index: Box::new(Expression::Infix {
-                            token: Token::Plus,
-                            operator: "+",
-                            left: Box::new(integer(1)),
-                            right: Box::new(integer(1)),
-                        }),
+            Program(vec![Statement::Expression {
+                token: Token::Identifier("myArray"),
+                expression: Some(Expression::Index {
+                    token: Token::Lbracket,
+                    left: Box::new(Expression::Identifier {
+                        token: Token::Identifier("myArray"),
+                        value: "myArray"
                     }),
-                }
-            ]),
+                    index: Box::new(Expression::Infix {
+                        token: Token::Plus,
+                        operator: "+",
+                        left: Box::new(integer(1)),
+                        right: Box::new(integer(1)),
+                    }),
+                }),
+            }]),
             program
         );
     }
 }
-

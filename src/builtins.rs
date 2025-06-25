@@ -4,9 +4,12 @@ use crate::object::Object;
 
 fn validate_args(args: &[Object], expected_args: usize, func: &str) -> Option<Object> {
     if args.len() != expected_args {
-        return Some(Object::Error(
-            format!("wrong number of arguments on function `{}`. got={}, want={}", func, args.len(), expected_args)
-        ));
+        return Some(Object::Error(format!(
+            "wrong number of arguments on function `{}`. got={}, want={}",
+            func,
+            args.len(),
+            expected_args
+        )));
     }
     None
 }
@@ -23,7 +26,10 @@ fn len_function(args: Vec<Object>) -> Object {
     match args[0] {
         Object::String(value) => Object::Integer(value.len() as i64),
         Object::Array(ref elems) => Object::Integer(elems.len() as i64),
-        _ => Object::Error(format!("argument {} not supported by `len`", args[0].inspect()))
+        _ => Object::Error(format!(
+            "argument {} not supported by `len`",
+            args[0].inspect()
+        )),
     }
 }
 
@@ -38,7 +44,10 @@ fn first_function(args: Vec<Object>) -> Object {
             }
             elems[0].to_owned()
         }
-        _ => Object::Error(format!("argument {} not supported by `first`", args[0].inspect()))
+        _ => Object::Error(format!(
+            "argument {} not supported by `first`",
+            args[0].inspect()
+        )),
     }
 }
 
@@ -53,7 +62,10 @@ fn last_function(args: Vec<Object>) -> Object {
             }
             elems[elems.len() - 1].to_owned()
         }
-        _ => Object::Error(format!("argument {} not supported by `last`", args[0].inspect()))
+        _ => Object::Error(format!(
+            "argument {} not supported by `last`",
+            args[0].inspect()
+        )),
     }
 }
 
@@ -68,7 +80,10 @@ fn rest_function(args: Vec<Object>) -> Object {
             }
             Object::Array(elems[1..].to_owned())
         }
-        _ => Object::Error(format!("argument {} not supported by `rest`", args[0].inspect()))
+        _ => Object::Error(format!(
+            "argument {} not supported by `rest`",
+            args[0].inspect()
+        )),
     }
 }
 
@@ -82,12 +97,15 @@ fn push_function(args: Vec<Object>) -> Object {
             new_elems.push(args[1].to_owned());
             Object::Array(new_elems)
         }
-        _ => Object::Error(format!("argument {} not supported by `push`", args[0].inspect()))
+        _ => Object::Error(format!(
+            "argument {} not supported by `push`",
+            args[0].inspect()
+        )),
     }
 }
 
 pub struct BuiltinFunctions {
-    store: HashMap<&'static str, Object>
+    store: HashMap<&'static str, Object>,
 }
 
 impl Default for BuiltinFunctions {
@@ -112,7 +130,7 @@ impl BuiltinFunctions {
 
     pub fn new() -> BuiltinFunctions {
         BuiltinFunctions {
-            store: BuiltinFunctions::get_store()
+            store: BuiltinFunctions::get_store(),
         }
     }
 

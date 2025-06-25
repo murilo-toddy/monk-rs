@@ -2,7 +2,7 @@
 pub enum Token {
     Illegal(char),
     Eof,
-    
+
     // Identifiers
     // TODO add support for floats
     Identifier(&'static str),
@@ -122,7 +122,6 @@ impl Token {
             Token::Return => "return",
             Token::True => "true",
             Token::False => "false",
-       }
-   }
+        }
+    }
 }
-
