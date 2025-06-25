@@ -779,20 +779,20 @@ struct VmTestCase {
     fn test_calling_functions_with_arguments_and_bindings() {
         let tests = vec![
             VmTestCase { 
-                input: "let identify = fn(a) { a }; identify(4);",
+                input: "let identify = fn(a: Integer) { a }; identify(4);",
                 expected: Object::Integer(4),
             },
             VmTestCase { 
-                input: "let sum = fn(a, b) { let c = a + b; c; }; sum(1, 2);",
+                input: "let sum = fn(a: Integer, b: Integer) { let c = a + b; c; }; sum(1, 2);",
                 expected: Object::Integer(3),
             },
             VmTestCase {
-                input: "let sum = fn(a, b) { let c = a + b; c; } sum(1, 2) + sum(3, 4)",
+                input: "let sum = fn(a: Integer, b: Integer) { let c = a + b; c; } sum(1, 2) + sum(3, 4)",
                 expected: Object::Integer(10),
             },
             VmTestCase {
                 input: "
-                    let sum = fn(a, b) { let c = a + b; c; }
+                    let sum = fn(a: Integer, b: Integer) { let c = a + b; c; }
                     let outer = fn() { sum(1, 2) + sum(3, 4); }
                     outer();
                 ",
@@ -849,13 +849,13 @@ struct VmTestCase {
     fn test_closures() {
         let tests = vec![
             VmTestCase { 
-                input: "let newClosure = fn(a) { fn() { a } }; let closure = newClosure(99); closure();",
+                input: "let newClosure = fn(a: Integer) { fn() { a } }; let closure = newClosure(99); closure();",
                 expected: Object::Integer(99),
             },
             VmTestCase { 
                 input: "
-                    let newAdder = fn(a, b) {
-                        fn(c) { a + b + c };
+                    let newAdder = fn(a: Integer, b: Integer) {
+                        fn(c: Integer) { a + b + c };
                     };
                     let adder = newAdder(1, 2);
                     adder(8) 
@@ -864,8 +864,8 @@ struct VmTestCase {
             },
             VmTestCase { 
                 input: "
-                    let newAdder = fn(a, b) {
-                        fn(c) { a + b + c; }
+                    let newAdder = fn(a: Integer, b: Integer) {
+                        fn(c: Integer) { a + b + c; }
                     };
                     let adder = newAdder(1, 2);
                     adder(8);
@@ -874,7 +874,7 @@ struct VmTestCase {
             },
             VmTestCase { 
                 input: "
-                    let newClosure = fn(a, b) {
+                    let newClosure = fn(a: Integer, b: Integer) {
                         let one = fn() { a }
                         let two = fn() { b }
                         fn() { one() + two() }
@@ -893,8 +893,8 @@ struct VmTestCase {
         // TODO for crying out loud this should be a compiler error!!!!
         let tests: Vec<(_, Result<(), _>)> = vec![
             ("fn() { 1; }(1)", Err("wrong number of arguments: expected 0 but got 1".to_string())),
-            ("fn(a) { }()", Err("wrong number of arguments: expected 1 but got 0".to_string())),
-            ("fn(a, b) { a + b; }(1)", Err("wrong number of arguments: expected 2 but got 1".to_string())),
+            ("fn(a: Integer) { }()", Err("wrong number of arguments: expected 1 but got 0".to_string())),
+            ("fn(a: Integer, b: Integer) { a + b; }(1)", Err("wrong number of arguments: expected 2 but got 1".to_string())),
         ];
         for (input, expected) in tests {
             let mut compiler = Compiler::new();

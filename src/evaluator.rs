@@ -359,7 +359,11 @@ impl Evaluator {
             } => self.evaluate_conditional_expression(conditions, alternative),
             Expression::Function {
                 arguments, body, ..
-            } => Object::Function(arguments, body, self.env.clone()),
+            } => Object::Function(
+                arguments.into_iter().map(|(arg, _type)| arg).collect(),
+                body,
+                self.env.clone(),
+            ),
             Expression::While {
                 condition,
                 statement,
@@ -772,7 +776,7 @@ mod evaluator_tests {
 
     #[test]
     fn test_function_object() {
-        let input = "fn(x) { x + 2; };";
+        let input = "fn(x: Integer) { x + 2; };";
         let evaluated = eval_input(input);
         match evaluated {
             Object::Function(params, block, ..) => {
@@ -787,30 +791,30 @@ mod evaluator_tests {
     fn test_function_application() {
         let tests = vec![
             (
-                "let identity = fn(x) { x; }; identity(5);",
+                "let identity = fn(x: Integer) { x; }; identity(5);",
                 Object::Integer(5),
             ),
             (
-                "let identity = fn(x) { return x; }; identity(5);",
+                "let identity = fn(x: Integer) { return x; }; identity(5);",
                 Object::Integer(5),
             ),
             (
-                "let double = fn(x) { x * 2; }; double(5);",
+                "let double = fn(x: Integer) { x * 2; }; double(5);",
                 Object::Integer(10),
             ),
             (
-                "let add = fn(x, y) { x + y; }; add(5, 5);",
+                "let add = fn(x: Integer, y: Integer) { x + y; }; add(5, 5);",
                 Object::Integer(10),
             ),
             (
-                "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+                "let add = fn(x: Integer, y: Integer) { x + y; }; add(5 + 5, add(5, 5));",
                 Object::Integer(20),
             ),
-            ("fn(x) { x; }(5)", Object::Integer(5)),
+            ("fn(x: Integer) { x; }(5)", Object::Integer(5)),
             (
                 "
-                    let newAdder = fn(x) {
-                        fn(y) { x + y; };
+                    let newAdder = fn(x: Integer) {
+                        fn(y: Integer) { x + y; };
                     }
                     let addTwo = newAdder(2);
                     addTwo(2);

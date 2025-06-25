@@ -312,7 +312,7 @@ impl Compiler {
             } => {
                 self.enter_scope();
                 let parameters_count = arguments.len();
-                for argument in arguments {
+                for (argument, _type) in arguments {
                     self.symbol_table.borrow_mut().define(argument.value);
                 }
                 self.compile_block_statement(body)?;
@@ -1062,7 +1062,7 @@ mod compiler_tests {
                 ],
             },
             CompilerTestCase {
-                input: "let oneArg = fn(a) { a; }; oneArg(24)",
+                input: "let oneArg = fn(a: Integer) { a; }; oneArg(24)",
                 expected_constants: vec![
                     Object::CompiledFunction {
                         function: vec![
@@ -1087,7 +1087,7 @@ mod compiler_tests {
                 ],
             },
             CompilerTestCase {
-                input: "let manyArg = fn(a, b, c) { a; b; c; }; manyArg(24, 25, 26)",
+                input: "let manyArg = fn(a: Integer, b: Integer, c: Integer) { a; b; c; }; manyArg(24, 25, 26)",
                 expected_constants: vec![
                     Object::CompiledFunction {
                         function: vec![
@@ -1250,7 +1250,7 @@ mod compiler_tests {
     fn test_closures() {
         let tests = vec![
             CompilerTestCase {
-                input: "fn(a) { fn(b) { a + b; } }",
+                input: "fn(a: Integer) { fn(b: Integer) { a + b; } }",
                 expected_constants: vec![
                     Object::CompiledFunction {
                         function: vec![
@@ -1285,9 +1285,9 @@ mod compiler_tests {
             },
             CompilerTestCase {
                 input: "
-                    fn(a) {
-                        fn(b) {
-                            fn(c) {
+                    fn(a: Integer) {
+                        fn(b: Integer) {
+                            fn(c: Integer) {
                             a + b + c
                             }
                         }

@@ -6,6 +6,15 @@ pub struct Identifier {
     pub value: &'static str,
 }
 
+impl Identifier {
+    pub fn from(value: &'static str) -> Identifier {
+        Identifier {
+            token: Token::Identifier(value),
+            value: value,
+        }
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Debug, Hash, PartialOrd)]
 pub enum Statement {
     Let {
@@ -71,7 +80,7 @@ pub enum Expression {
     },
     Function {
         token: Token,
-        arguments: Vec<Identifier>,
+        arguments: Vec<(Identifier, Type)>,
         body: BlockStatement,
     },
     Call {
@@ -120,6 +129,24 @@ pub enum Precedence {
     Prefix = 13,     // -x or !x
     Call = 14,       // func(x)
     Index = 15,      // arr[i]
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Hash, PartialOrd)]
+pub enum Type {
+    String,
+    Integer,
+    Boolean,
+}
+
+impl Type {
+    pub fn from(typ: &'static str) -> Option<Type> {
+        match typ {
+            "String" => Some(Type::String),
+            "Integer" => Some(Type::Integer),
+            "Boolean" => Some(Type::Boolean),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Identifier {
@@ -223,7 +250,7 @@ impl std::fmt::Display for Expression {
                     "{}",
                     arguments
                         .iter()
-                        .map(|i| format!("{}", i))
+                        .map(|(i, t)| format!("{}: {}", i, t))
                         .collect::<Vec<String>>()
                         .join(", ")
                         .as_str()
@@ -293,5 +320,16 @@ impl std::fmt::Display for Program {
             write!(f, "{}", statement)?;
         }
         Ok(())
+    }
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let repr = match self {
+            Type::String => "String",
+            Type::Integer => "Integer",
+            Type::Boolean => "Boolean",
+        };
+        write!(f, "{}", repr)
     }
 }

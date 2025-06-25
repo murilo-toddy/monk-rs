@@ -319,7 +319,58 @@ impl<'a> Parser<'a> {
         left_expression
     }
 
+    fn parse_function_arguments(&mut self) -> Option<Vec<(Identifier, Type)>> {
+        let mut identifiers = Vec::new();
+
+        // no arguments provided
+        if self.peek_token_is(&Token::Rparen) {
+            self.next();
+            return Some(identifiers);
+        }
+
+        fn parse_single_argument(parser: &mut Parser) -> Option<(Identifier, Type)> {
+            // TODO: remove clone
+            let value_token = parser.current_token.clone();
+            if let Token::Identifier(value) = value_token {
+                parser.expect_peek(&Token::Colon);
+                parser.next();
+                if let Token::Identifier(type_ident) = parser.current_token.clone() {
+                    let typ = Type::from(type_ident);
+                    if typ.is_none() {
+                        parser.push_parse_error(&format!("Type {} does not exist", type_ident));
+                        return None;
+                    }
+                    return Some((
+                        Identifier {
+                            token: value_token.clone(),
+                            value,
+                        },
+                        typ?,
+                    ));
+                }
+            };
+            return None;
+        }
+
+        self.next();
+        parse_single_argument(self).map(|arg| identifiers.push(arg));
+
+        while self.peek_token_is(&Token::Comma) {
+            self.next();
+            self.next();
+            parse_single_argument(self).map(|arg| identifiers.push(arg));
+        }
+
+        if !self.expect_peek(&Token::Rparen) {
+            return None;
+        }
+
+        Some(identifiers)
+    }
+
     fn parse_function_literal(&mut self) -> Option<Expression> {
+        // function definition:
+        // fn(arg1: type1, arg2: type2, ...): return_type { ... }
         let function_token = self.current_token.clone();
         if !self.expect_peek(&Token::Lparen) {
             return None;
@@ -442,40 +493,6 @@ impl<'a> Parser<'a> {
             return None;
         }
         expression
-    }
-
-    fn parse_function_arguments(&mut self) -> Option<Vec<Identifier>> {
-        let mut identifiers = Vec::new();
-
-        if self.peek_token_is(&Token::Rparen) {
-            self.next();
-            return Some(identifiers);
-        }
-
-        self.next();
-        if let Token::Identifier(value) = &self.current_token {
-            identifiers.push(Identifier {
-                token: self.current_token.clone(),
-                value,
-            });
-        }
-
-        while self.peek_token_is(&Token::Comma) {
-            self.next();
-            self.next();
-            if let Token::Identifier(value) = &self.current_token {
-                identifiers.push(Identifier {
-                    token: self.current_token.clone(),
-                    value,
-                });
-            }
-        }
-
-        if !self.expect_peek(&Token::Rparen) {
-            return None;
-        }
-
-        Some(identifiers)
     }
 
     fn parse_block_statement(&mut self) -> BlockStatement {
@@ -1149,7 +1166,7 @@ mod parser_tests {
 
     #[test]
     fn test_function_literal() {
-        let input = "fn(x, y) { x + y; }".as_bytes();
+        let input = "fn(x: Integer, y: Integer) { x + y; }".as_bytes();
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -1161,14 +1178,20 @@ mod parser_tests {
                 expression: Some(Expression::Function {
                     token: Token::Function,
                     arguments: vec![
-                        Identifier {
-                            token: Token::Identifier("x"),
-                            value: "x"
-                        },
-                        Identifier {
-                            token: Token::Identifier("y"),
-                            value: "y"
-                        },
+                        (
+                            Identifier {
+                                token: Token::Identifier("x"),
+                                value: "x"
+                            },
+                            Type::Integer,
+                        ),
+                        (
+                            Identifier {
+                                token: Token::Identifier("y"),
+                                value: "y"
+                            },
+                            Type::Integer,
+                        )
                     ],
                     body: BlockStatement {
                         token: Token::Lbrace,
@@ -1186,6 +1209,40 @@ mod parser_tests {
             }]),
             program
         );
+    }
+
+    #[test]
+    fn test_function_literal_argument_types() {
+        let test_cases = vec![(
+            "fn(a: Integer, b: String, c: Boolean) {}",
+            vec![
+                (Identifier::from("a"), Type::Integer),
+                (Identifier::from("b"), Type::String),
+                (Identifier::from("c"), Type::Boolean),
+            ],
+        )];
+
+        for (input, expected_arguments) in test_cases {
+            let lexer = Lexer::new(input.as_bytes());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            check_parse_errors(parser);
+
+            assert_eq!(
+                Program(vec![Statement::Expression {
+                    token: Token::Function,
+                    expression: Some(Expression::Function {
+                        token: Token::Function,
+                        arguments: expected_arguments,
+                        body: BlockStatement {
+                            token: Token::Lbrace,
+                            statements: vec![],
+                        }
+                    }),
+                }]),
+                program
+            );
+        }
     }
 
     #[test]
