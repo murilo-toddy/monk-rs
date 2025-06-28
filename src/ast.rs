@@ -133,20 +133,11 @@ pub enum Precedence {
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, PartialOrd)]
 pub enum Type {
+    Null,
     String,
     Integer,
     Boolean,
-}
-
-impl Type {
-    pub fn from(typ: &'static str) -> Option<Type> {
-        match typ {
-            "String" => Some(Type::String),
-            "Integer" => Some(Type::Integer),
-            "Boolean" => Some(Type::Boolean),
-            _ => None,
-        }
-    }
+    Array(Box<Type>),
 }
 
 impl std::fmt::Display for Identifier {
@@ -326,9 +317,11 @@ impl std::fmt::Display for Program {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let repr = match self {
+            Type::Null => "Null",
             Type::String => "String",
             Type::Integer => "Integer",
             Type::Boolean => "Boolean",
+            Type::Array(inner) => &format!("Array<{}>", inner),
         };
         write!(f, "{}", repr)
     }

@@ -319,6 +319,54 @@ impl<'a> Parser<'a> {
         left_expression
     }
 
+    fn parse_argument_type(&mut self, type_ident: &'static str) -> Option<Type> {
+        return match type_ident {
+            "String" => Some(Type::String),
+            "Integer" => Some(Type::Integer),
+            "Boolean" => Some(Type::Boolean),
+            "Array" => {
+                if !self.expect_peek(&Token::Lt) {
+                    return None;
+                }
+                self.next();
+                if let &Token::Identifier(type_ident) = &self.current_token {
+                    let inner_type = self.parse_argument_type(type_ident)?;
+                    if !self.expect_peek(&Token::Gt) {
+                        return None;
+                    }
+                    return Some(Type::Array(Box::new(inner_type)));
+                }
+                return None;
+            }
+            _ => None,
+        };
+    }
+
+    fn parse_single_argument(&mut self) -> Option<(Identifier, Type)> {
+        // TODO: remove clone
+        let value_token = self.current_token.clone();
+        if let Token::Identifier(value) = value_token {
+            self.expect_peek(&Token::Colon);
+            self.next();
+
+            if let Token::Identifier(type_ident) = self.current_token.clone() {
+                let typ = self.parse_argument_type(type_ident);
+                if typ.is_none() {
+                    self.push_parse_error(&format!("Type {} does not exist", type_ident));
+                    return None;
+                }
+                return Some((
+                    Identifier {
+                        token: value_token.clone(),
+                        value,
+                    },
+                    typ?,
+                ));
+            }
+        };
+        return None;
+    }
+
     fn parse_function_arguments(&mut self) -> Option<Vec<(Identifier, Type)>> {
         let mut identifiers = Vec::new();
 
@@ -328,37 +376,15 @@ impl<'a> Parser<'a> {
             return Some(identifiers);
         }
 
-        fn parse_single_argument(parser: &mut Parser) -> Option<(Identifier, Type)> {
-            // TODO: remove clone
-            let value_token = parser.current_token.clone();
-            if let Token::Identifier(value) = value_token {
-                parser.expect_peek(&Token::Colon);
-                parser.next();
-                if let Token::Identifier(type_ident) = parser.current_token.clone() {
-                    let typ = Type::from(type_ident);
-                    if typ.is_none() {
-                        parser.push_parse_error(&format!("Type {} does not exist", type_ident));
-                        return None;
-                    }
-                    return Some((
-                        Identifier {
-                            token: value_token.clone(),
-                            value,
-                        },
-                        typ?,
-                    ));
-                }
-            };
-            return None;
-        }
-
         self.next();
-        parse_single_argument(self).map(|arg| identifiers.push(arg));
+        self.parse_single_argument()
+            .map(|arg| identifiers.push(arg));
 
         while self.peek_token_is(&Token::Comma) {
             self.next();
             self.next();
-            parse_single_argument(self).map(|arg| identifiers.push(arg));
+            self.parse_single_argument()
+                .map(|arg| identifiers.push(arg));
         }
 
         if !self.expect_peek(&Token::Rparen) {
@@ -1214,11 +1240,12 @@ mod parser_tests {
     #[test]
     fn test_function_literal_argument_types() {
         let test_cases = vec![(
-            "fn(a: Integer, b: String, c: Boolean) {}",
+            "fn(a: Integer, b: String, c: Boolean, d: Array<String>) {}",
             vec![
                 (Identifier::from("a"), Type::Integer),
                 (Identifier::from("b"), Type::String),
                 (Identifier::from("c"), Type::Boolean),
+                (Identifier::from("d"), Type::Array(Box::new(Type::String))),
             ],
         )];
 
