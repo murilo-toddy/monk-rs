@@ -1,8 +1,8 @@
 build:
-	cargo build
+	rustc --edition=2021 src/main.rs
 
-test: build
+test:
 	cargo test
 
 repl: build
-	cargo run
+	./main

@@ -123,6 +123,6 @@ $ make repl
 ### Running examples
 
 ```bash
-$ cargo run -- examples/<filename>.mk
+$ make build && ./main examples/<filename>.mk
 ```
 

@@ -25,7 +25,17 @@ fn main() -> io::Result<()> {
     let mut writer = output.lock();
 
     if args.len() == 2 {
-        let input = fs::read_to_string(&args[1]).expect("Should be able to read file");
+        let file = &args[1];
+        let input = match fs::read_to_string(file) {
+            Ok(content) => content,
+            Err(error) => {
+                writer.write_all(
+                    format!("ERROR: Unable to open file {}: {}\n", file, error.kind()).as_bytes(),
+                )?;
+                writer.flush()?;
+                std::process::exit(1);
+            }
+        };
 
         let env = environment::Environment::new();
         let mut evaluator = evaluator::Evaluator::new(env);
@@ -44,7 +54,7 @@ fn main() -> io::Result<()> {
         let mut reader = input.lock();
         repl::start(&mut reader, &mut writer)?;
     } else {
-        writer.write_all("Usage: cargo run -- <filename>.mk\n".as_bytes())?;
+        writer.write_all(format!("Usage: {} <filename>.mk\n", args[0]).as_bytes())?;
         writer.flush()?;
     }
     Ok(())

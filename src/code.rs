@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 pub type Instructions = Vec<u8>;
 
 fn format_instruction(def: Definition, operands: Vec<i64>) -> String {

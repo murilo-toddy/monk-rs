@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::collections::HashMap;
 
 use crate::{builtins::BUILTINS, code::Opcode, compiler::Bytecode, frame::Frame, object::Object};
