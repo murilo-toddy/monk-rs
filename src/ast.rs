@@ -137,7 +137,10 @@ pub enum Type {
     String,
     Integer,
     Boolean,
-    Array(Box<Type>),
+    // TODO: implement typed array and hash
+    Array,
+    Hash,
+    Function(Vec<Type>, Box<Type>), // [args], return
 }
 
 impl std::fmt::Display for Identifier {
@@ -321,7 +324,16 @@ impl std::fmt::Display for Type {
             Type::String => "String",
             Type::Integer => "Integer",
             Type::Boolean => "Boolean",
-            Type::Array(inner) => &format!("Array<{}>", inner),
+            Type::Array => "Array",
+            Type::Hash => "HashMap",
+            Type::Function(args, ret) => &format!(
+                "fn({}): {}",
+                args.iter()
+                    .map(|arg| format!("{}", arg))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                ret
+            ),
         };
         write!(f, "{}", repr)
     }
