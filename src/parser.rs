@@ -323,6 +323,7 @@ impl<'a> Parser<'a> {
     fn parse_function_type_arguments(&mut self) -> Vec<Type> {
         let mut args = Vec::new();
         if self.peek_token_is(&Token::Rparen) {
+            self.next();
             return args;
         }
 
@@ -338,7 +339,6 @@ impl<'a> Parser<'a> {
         if !self.expect_peek(&Token::Rparen) {
             self.push_parse_error(&format!("Expected function declaration to finish with ')'"));
         }
-        panic!("{:?} {:?} {:?}", self.current_token, self.peek_token, args);
         args
     }
 
@@ -350,6 +350,7 @@ impl<'a> Parser<'a> {
                 "Integer" => Some(Type::Integer),
                 "Boolean" => Some(Type::Boolean),
                 "Array" => Some(Type::Array),
+                "HashMap" => Some(Type::Hash),
                 _ => {
                     self.push_parse_error(&format!("Type {} does not exist", type_str));
                     None
@@ -363,13 +364,11 @@ impl<'a> Parser<'a> {
                 let args = self.parse_function_type_arguments();
 
                 let mut return_type = Type::Null;
-                if self.current_token_is(Token::Colon) {
+                if self.peek_token_is(&Token::Colon) {
+                    self.next();
+                    self.next();
                     return_type = self.parse_argument_type()?; // error has already been registered
                 }
-                panic!(
-                    "{:?} {:?} {}",
-                    self.current_token, self.peek_token, return_type
-                );
                 return Some(Type::Function(args, Box::from(return_type)));
             }
             _ => {
@@ -402,23 +401,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_arguments(&mut self) -> Option<Vec<(Identifier, Type)>> {
-        let mut identifiers = Vec::new();
+        let mut args = Vec::new();
 
         // no arguments provided
         if self.peek_token_is(&Token::Rparen) {
             self.next();
-            return Some(identifiers);
+            return Some(args);
         }
 
         self.next();
-        self.parse_single_argument()
-            .map(|arg| identifiers.push(arg));
+        self.parse_single_argument().map(|arg| args.push(arg));
 
         while self.peek_token_is(&Token::Comma) {
             self.next();
             self.next();
-            self.parse_single_argument()
-                .map(|arg| identifiers.push(arg));
+            self.parse_single_argument().map(|arg| args.push(arg));
         }
 
         // panic!("{:?} {:?}", self.current_token, self.peek_token);
@@ -426,7 +423,8 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        Some(identifiers)
+        // panic!("{:?} {:?} {:?}", self.current_token, self.peek_token, args);
+        Some(args)
     }
 
     fn parse_function_literal(&mut self) -> Option<Expression> {
@@ -1275,16 +1273,17 @@ mod parser_tests {
     #[test]
     fn test_function_literal_argument_types() {
         let test_cases = vec![
-            // (
-            //     "fn(a: Integer, b: String, c: Boolean, d: Null, e: Array) {}",
-            //     vec![
-            //         (Identifier::from("a"), Type::Integer),
-            //         (Identifier::from("b"), Type::String),
-            //         (Identifier::from("c"), Type::Boolean),
-            //         (Identifier::from("d"), Type::Null),
-            //         (Identifier::from("e"), Type::Array),
-            //     ],
-            // ),
+            (
+                "fn(a: Integer, b: String, c: Boolean, d: Null, e: Array, f: HashMap) {}",
+                vec![
+                    (Identifier::from("a"), Type::Integer),
+                    (Identifier::from("b"), Type::String),
+                    (Identifier::from("c"), Type::Boolean),
+                    (Identifier::from("d"), Type::Null),
+                    (Identifier::from("e"), Type::Array),
+                    (Identifier::from("f"), Type::Hash),
+                ],
+            ),
             (
                 "fn(a: fn(Integer)) {}",
                 vec![(
@@ -1292,13 +1291,13 @@ mod parser_tests {
                     Type::Function(vec![Type::Integer], Box::new(Type::Null)),
                 )],
             ),
-            // (
-            //     "fn(a: fn(Integer, String): Boolean) {}",
-            //     vec![(
-            //         Identifier::from("a"),
-            //         Type::Function(vec![Type::Integer, Type::String], Box::new(Type::Boolean)),
-            //     )],
-            // ),
+            (
+                "fn(a: fn(Integer, String): Boolean) {}",
+                vec![(
+                    Identifier::from("a"),
+                    Type::Function(vec![Type::Integer, Type::String], Box::new(Type::Boolean)),
+                )],
+            ),
             (
                 "fn(a: fn()) {}",
                 vec![(
@@ -1325,7 +1324,7 @@ mod parser_tests {
                             statements: vec![],
                         }
                     }),
-                }]),
+                }],),
                 program,
                 "input: {}",
                 input,
